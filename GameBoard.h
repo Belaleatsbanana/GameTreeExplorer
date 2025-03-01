@@ -48,6 +48,26 @@ public:
         }
     }
 
+    // Copy constructor
+    GameBoard(const GameBoard &other)
+    {
+        // Copy the contents of the other board
+        for (size_t i = 0; i < Width; ++i)
+        {
+            for (size_t j = 0; j < Height; ++j)
+            {
+                if (other.board[i][j] != nullptr)
+                {
+                    board[i][j] = new Token(*other.board[i][j]);
+                }
+                else
+                {
+                    board[i][j] = nullptr;
+                }
+            }
+        }
+    }
+
     // Place a token on the board
     void placeToken(int x, int y, int player)
     {
@@ -60,6 +80,24 @@ public:
             throw runtime_error("Position is already occupied.");
         }
         board[x][y] = new Token(x, y, player);
+    }
+
+    // Place a token on the board
+    void placeToken(Token *token)
+    {
+        pair<int, int> pos = token->getPosition();
+        int x = pos.first;
+        int y = pos.second;
+
+        if (x < 0 || x >= Width || y < 0 || y >= Height)
+        {
+            throw out_of_range("Position is out of bounds.");
+        }
+        if (board[x][y] != nullptr)
+        {
+            throw runtime_error("Position is already occupied.");
+        }
+        board[x][y] = token;
     }
 
     // Move a token on the board
