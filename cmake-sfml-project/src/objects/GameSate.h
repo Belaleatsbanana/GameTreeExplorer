@@ -25,7 +25,7 @@ private:
 
 public:
     // Constructor
-    GameState() : currentPlayer(0)
+    GameState(float cellW, float cellH) : currentPlayer(0)
     {
         // Initialize the players using the existing constructor
         players[0] = Player<MaxTokensPerPlayer>(0); // Player 0
@@ -38,8 +38,8 @@ public:
         for (size_t i = 0; i < MaxTokensPerPlayer; ++i)
         {
             // Create tokens for each player
-            Token *token1 = new Token(0, i + 1, players[0].getPlayerNumber()); // Left border excluding corners
-            Token *token2 = new Token(i + 1, 0, players[1].getPlayerNumber()); // Top border excluding corners
+            Token *token1 = new Token(0, i + 1, players[0].getPlayerNumber(), "rtoken.png", cellW, cellH); // Left border excluding corners
+            Token *token2 = new Token(i + 1, 0, players[1].getPlayerNumber(), "gtoken.png", cellW, cellH); // Top border excluding corners
 
             // Add tokens to the players
             players[0].addToken(token1);
