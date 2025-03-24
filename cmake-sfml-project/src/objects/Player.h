@@ -18,6 +18,8 @@ private:
     int playerNumber;         // Unique identifier for the player (e.g., 0 or 1)
     Token *tokens[MaxTokens]; // Fixed-size array of pointers to tokens
     size_t tokenCount;        // Number of tokens currently owned by the player
+    int score;                // Player's score
+    int movableTokens;        // Number of movable tokens
 
 public:
     // Default constructor
@@ -31,7 +33,7 @@ public:
     }
 
     // Constructor
-    Player(int number) : playerNumber(number), tokenCount(0)
+    Player(int number) : playerNumber(number), tokenCount(0), score(0)
     {
         // Initialize the tokens array to nullptr
         for (size_t i = 0; i < MaxTokens; ++i)
@@ -66,6 +68,30 @@ public:
     size_t getTokenCount() const
     {
         return tokenCount;
+    }
+
+    // Get the player's score
+    int getScore() const
+    {
+        return score;
+    }
+
+    // Set the player's score
+    void setScore(int newScore)
+    {
+        score = newScore;
+    }
+
+    // Get the number of movable tokens
+    int getMovableTokens() const
+    {
+        return movableTokens;
+    }
+
+    // Set the number of movable tokens
+    void setMovableTokens(int count)
+    {
+        movableTokens = count;
     }
 
     // Check if the player has any movable tokens

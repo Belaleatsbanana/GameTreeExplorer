@@ -14,6 +14,7 @@ private:
     float cellSize;
     bool tokenSelected;
     std::pair<int, int> selectedPosition;
+    std::pair<int, int> possibleMove;
 
     void handleMouseClick(int mouseX, int mouseY)
     {
@@ -22,37 +23,57 @@ private:
 
         try
         {
-            if (!tokenSelected)
+            // Select token if it belongs to current player
+            Token *token = state.getBoard().getTokenAt(gridX, gridY);
+
+            if (token && token->getPlayer() == state.getCurrentPlayer().getPlayerNumber())
             {
-                // Select token if it belongs to current player
-                Token *token = state.getBoard().getTokenAt(gridX, gridY);
-                if (token && token->getPlayer() == state.getCurrentPlayer().getPlayerNumber())
-                {
-                    tokenSelected = true;
-                    selectedPosition = {gridX, gridY};
-                }
-            }
-            else
-            {
-                // Move selected token based on player direction
+                tokenSelected = true;
+                selectedPosition = {gridX, gridY};
+
                 int dx = 0, dy = 0;
                 if (state.getCurrentPlayer().getPlayerNumber() == 0)
                 {
-                    dx = 1; // Player 1 (top) moves down
+                    dx = 1;
                 }
                 else
                 {
-                    dy = 1; // Player 2 (left) moves right
+                    dy = 1;
                 }
+
+                possibleMove = state.getBoard().getTokenMove(gridX, gridY, gridX + dx, gridY + dy);
+            }
+            else if (gridX == possibleMove.first && gridY == possibleMove.second)
+            {
 
                 state.moveToken(
                     selectedPosition.first,
                     selectedPosition.second,
-                    selectedPosition.first + dx,
-                    selectedPosition.second + dy);
+                    possibleMove.first,
+                    possibleMove.second);
 
                 tokenSelected = false;
-                state.switchPlayer();
+                possibleMove = {-1, -1};
+
+                if (state.getCurrentPlayer().getScore() == MaxTokens)
+                {
+                    std::cout << "Player " << state.getCurrentPlayer().getPlayerNumber() << " wins!" << std::endl;
+                    window.close();
+                }
+
+                if (state.getOtherPlayer().getMovableTokens() == 0)
+                {
+                    std::cout << "Other Player has no more moves!" << std::endl;
+                }
+                else
+                {
+                    state.switchPlayer();
+                }
+            }
+            else
+            {
+                tokenSelected = false;
+                possibleMove = {-1, -1};
             }
         }
         catch (const std::exception &ex)
@@ -94,6 +115,17 @@ private:
             selection.setOutlineColor(sf::Color::Yellow);
             selection.setOutlineThickness(3);
             window.draw(selection);
+
+            if (possibleMove.first != -1)
+            {
+                sf::CircleShape circle(cellSize / 4);
+                circle.setFillColor(sf::Color(128, 128, 128)); // Gray color
+                circle.setPosition(sf::Vector2f(
+                    possibleMove.first * cellSize + cellSize / 4,
+                    possibleMove.second * cellSize + cellSize / 4));
+
+                window.draw(circle);
+            }
         }
 
         window.display();

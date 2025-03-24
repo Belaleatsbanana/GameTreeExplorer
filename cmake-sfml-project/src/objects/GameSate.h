@@ -98,6 +98,42 @@ public:
     void moveToken(int fromX, int fromY, int toX, int toY)
     {
         board.moveToken(fromX, fromY, toX, toY);
+
+        if (board.getTokenAt(toX, toY)->hasReachedEnd())
+        {
+            players[currentPlayer].setScore(players[currentPlayer].getScore() + 1);
+        }
+
+        int movableTokens0 = 0, movableTokens1 = 0;
+        // update player tokens movable status
+
+        Token **player0Tokens = players[0].getTokens();
+        Token **player1Tokens = players[1].getTokens();
+        for (size_t i = 0; i < MaxTokensPerPlayer; ++i)
+        {
+            if (board.canTokenMove(player0Tokens[i]))
+            {
+                player0Tokens[i]->setMovable(true);
+                movableTokens0++;
+            }
+            else
+            {
+                player0Tokens[i]->setMovable(false);
+            }
+
+            if (board.canTokenMove(player1Tokens[i]))
+            {
+                player1Tokens[i]->setMovable(true);
+                movableTokens1++;
+            }
+            else
+            {
+                player1Tokens[i]->setMovable(false);
+            }
+        }
+
+        players[0].setMovableTokens(movableTokens0);
+        players[1].setMovableTokens(movableTokens1);
     }
 
     // Print the game board

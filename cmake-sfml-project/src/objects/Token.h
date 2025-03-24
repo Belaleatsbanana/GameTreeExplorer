@@ -14,6 +14,7 @@ private:
     sf::Texture texture;          // Texture for the token's image
     sf::Sprite sprite;            // Sprite for the token
     float scaleFactor;            // Scale factor for the token
+    bool reachedEnd = false;
 
 public:
     // Constructor with coordinates
@@ -42,7 +43,7 @@ public:
         sprite.setOrigin(sf::Vector2f(texSize.x / 2.0f, texSize.y / 2.0f));
         // Scale the sprite to fit the cell size
         // Calculate scaling to fit 90% of cell
-        }
+    }
 
     void updatePosition(float cellW, float cellH)
     {
@@ -88,6 +89,21 @@ public:
         setPosition(x, y);
     }
 
+    // Check if the token has reached the end of the board
+    bool hasReachedEnd() const
+    {
+        return reachedEnd;
+    }
+
+    // Set the token as having reached the end of the board
+    void tokenReachedEnd()
+    {
+        reachedEnd = true;
+
+        canMove = false;
+    }
+
+    // Draw the token on the window
     void draw(sf::RenderWindow &window, float cellWidth, float cellHeight)
     {
         updatePosition(cellWidth, cellHeight);

@@ -177,8 +177,106 @@ public:
         board[toX][toY] = board[fromX][fromY];
         board[fromX][fromY] = nullptr;
         board[toX][toY]->move(toX, toY);
+
+        // Check if token has reached the end of the board
+        if (toX == 0 || toX == Width - 1 || toY == 0 || toY == Height - 1)
+        {
+            board[toX][toY]->tokenReachedEnd();
+        }
     }
 
+    std::pair<int, int> getTokenMove(int fromX, int fromY, int toX, int toY)
+    {
+        if (fromX < 0 || fromX >= Width || fromY < 0 || fromY >= Height ||
+            toX < 0 || toX >= Width || toY < 0 || toY >= Height)
+        {
+            return {-1, -1};
+        }
+        if (!board[fromX][fromY])
+        {
+            throw std::runtime_error("No token at source position");
+        }
+        if (board[toX][toY])
+        {
+            if (board[fromX][fromY]->getPlayer() == 0)
+            {
+                if (board[toX + 1][toY])
+                {
+                    return {-1, -1};
+                }
+                else
+                {
+                    toX++;
+                }
+            }
+            else if (board[fromX][fromY]->getPlayer() == 1)
+            {
+                if (board[toX][toY + 1])
+                {
+                    return {-1, -1};
+                }
+                else
+                {
+                    toY++;
+                }
+            }
+        }
+        if (!board[fromX][fromY]->isMovable())
+        {
+            throw std::runtime_error("Token is immovable");
+        }
+        return {toX, toY};
+    }
+
+    bool canTokenMove(Token *token)
+    {
+
+        int player = token->getPlayer();
+
+        int toX, toY;
+        if (player == 0)
+        {
+            toX = token->getPosition().first + 1;
+            toY = token->getPosition().second;
+        }
+        else
+        {
+            toX = token->getPosition().first;
+            toY = token->getPosition().second + 1;
+        }
+
+        if (toX < 0 || toX >= Width || toY < 0 || toY >= Height)
+        {
+            return false;
+        }
+        if (board[toX][toY])
+        {
+            if (player == 0)
+            {
+                if (board[toX + 1][toY])
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+            else if (player == 1)
+            {
+                if (board[toX][toY + 1])
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+
+        return true;
+    }
     void draw(sf::RenderWindow &window, float cellW, float cellH)
     {
         // Draw cells

@@ -2,7 +2,7 @@
 
 int main()
 {
-    GameManager<10, 10, 8> gameManager;
+    GameManager<5, 5, 3> gameManager;
     gameManager.run();
     return 0;
 }
