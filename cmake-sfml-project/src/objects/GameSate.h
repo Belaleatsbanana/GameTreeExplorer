@@ -1,145 +1,71 @@
 #ifndef GAMESTATE_H
 #define GAMESTATE_H
 
-#include <iostream>
-#include <stdexcept> // For std::out_of_range
 #include "Player.h"
 #include "GameBoard.h"
+#include <stdexcept>
 
-using namespace std;
-
-/**
- * Represents the state of a game.
- *
- * @tparam Width  The width of the game board.
- * @tparam Height The height of the game board.
- * @tparam MaxTokensPerPlayer The maximum number of tokens each player can have.
- */
-template <size_t Width, size_t Height, size_t MaxTokensPerPlayer>
 class GameState
 {
 private:
-    GameBoard<Width, Height> board;        // The game board
-    Player<MaxTokensPerPlayer> players[2]; // Array of players
-    int currentPlayer;                     // Index of the current player
+    size_t MaxTokensPerPlayer;
+    GameBoard board;
+    Player player1;
+    Player player2;
+    int currentPlayer;
 
-public:
-    // Constructor
-    GameState(float cellW, float cellH) : currentPlayer(0)
+    void initializeTokens(float cellW, float cellH)
     {
-        // Initialize the players using the existing constructor
-        players[0] = Player<MaxTokensPerPlayer>(0); // Player 0
-        players[1] = Player<MaxTokensPerPlayer>(1); // Player 1
-
-        // Initialize the game board
-        board = GameBoard<Width, Height>();
-
-        // Add tokens to the players and place them on the board
         for (size_t i = 0; i < MaxTokensPerPlayer; ++i)
         {
-            // Create tokens for each player
-            Token *token1 = new Token(0, i + 1, players[0].getPlayerNumber(), "rtoken.png", cellW, cellH); // Left border excluding corners
-            Token *token2 = new Token(i + 1, 0, players[1].getPlayerNumber(), "gtoken.png", cellW, cellH); // Top border excluding corners
+            Token *token1 = new Token(0, i + 1, 0, "rtoken.png", cellW, cellH);
+            Token *token2 = new Token(i + 1, 0, 1, "gtoken.png", cellW, cellH);
 
-            // Add tokens to the players
-            players[0].addToken(token1);
-            players[1].addToken(token2);
+            player1.addToken(token1);
+            player2.addToken(token2);
 
-            // Place tokens on the board
             board.placeToken(token1);
             board.placeToken(token2);
         }
     }
 
-    // Destructor
-    ~GameState()
+public:
+    GameState(float cellW, float cellH, size_t gameSize)
+        : MaxTokensPerPlayer(gameSize - 2),
+          board(gameSize, gameSize),
+          player1(0, MaxTokensPerPlayer),
+          player2(1, MaxTokensPerPlayer),
+          currentPlayer(0)
     {
-        cout << "Destroying GameState..." << endl;
-
-        cout << "GameState destroyed." << endl;
+        initializeTokens(cellW, cellH);
     }
 
-    // Copy constructor
-    GameState(const GameState &other) : currentPlayer(other.currentPlayer)
-    {
-        // Copy the game board
-        board = other.board;
+    // Delete copy operations
+    GameState(const GameState &) = delete;
+    GameState &operator=(const GameState &) = delete;
 
-        // Copy the players
-        players[0] = other.players[0];
-        players[1] = other.players[1];
-    }
+    Player &getCurrentPlayer() { return currentPlayer == 0 ? player1 : player2; }
+    Player &getOtherPlayer() { return currentPlayer == 0 ? player2 : player1; }
+    GameBoard &getBoard() { return board; }
 
-    // Get the current player
-    Player<MaxTokensPerPlayer> &getCurrentPlayer()
-    {
-        return players[currentPlayer];
-    }
-
-    // Get the other player
-    Player<MaxTokensPerPlayer> &getOtherPlayer()
-    {
-        return players[1 - currentPlayer];
-    }
-
-    // Switch to the other player
     void switchPlayer()
     {
         currentPlayer = 1 - currentPlayer;
     }
 
-    // Get the game board
-    GameBoard<Width, Height> &getBoard()
-    {
-        return board;
-    }
-
-    // Move a token on the board
     void moveToken(int fromX, int fromY, int toX, int toY)
     {
         board.moveToken(fromX, fromY, toX, toY);
+        player1.updateMovableTokens();
+        player2.updateMovableTokens();
 
-        if (board.getTokenAt(toX, toY)->hasReachedEnd())
+        if (auto token = board.getTokenAt(toX, toY))
         {
-            players[currentPlayer].setScore(players[currentPlayer].getScore() + 1);
-        }
-
-        int movableTokens0 = 0, movableTokens1 = 0;
-        // update player tokens movable status
-
-        Token **player0Tokens = players[0].getTokens();
-        Token **player1Tokens = players[1].getTokens();
-        for (size_t i = 0; i < MaxTokensPerPlayer; ++i)
-        {
-            if (board.canTokenMove(player0Tokens[i]))
+            if (token->hasReachedEnd())
             {
-                player0Tokens[i]->setMovable(true);
-                movableTokens0++;
-            }
-            else
-            {
-                player0Tokens[i]->setMovable(false);
-            }
-
-            if (board.canTokenMove(player1Tokens[i]))
-            {
-                player1Tokens[i]->setMovable(true);
-                movableTokens1++;
-            }
-            else
-            {
-                player1Tokens[i]->setMovable(false);
+                getCurrentPlayer().setScore(getCurrentPlayer().getScore() + 1);
             }
         }
-
-        players[0].setMovableTokens(movableTokens0);
-        players[1].setMovableTokens(movableTokens1);
-    }
-
-    // Print the game board
-    void printBoard()
-    {
-        board.printBoard();
     }
 };
 

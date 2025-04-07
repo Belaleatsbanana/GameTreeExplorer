@@ -1,86 +1,149 @@
+
 #ifndef GAMEMANAGER_H
 #define GAMEMANAGER_H
 
 #include <SFML/Graphics.hpp>
-#include "GameSate.h"
 #include <iostream>
+#include <memory>
+#include "GameSate.h"
 
-template <size_t Width, size_t Height, size_t MaxTokens>
 class GameManager
 {
 private:
-    sf::RenderWindow window;
-    GameState<Width, Height, MaxTokens> state;
-    float cellSize;
-    bool tokenSelected;
-    std::pair<int, int> selectedPosition;
-    std::pair<int, int> possibleMove;
-
-    void handleMouseClick(int mouseX, int mouseY)
+    struct GameSettings
     {
-        const unsigned gridX = mouseX / cellSize;
-        const unsigned gridY = mouseY / cellSize;
+        size_t size;
+        size_t maxTokens;
+        float cellSize;
+        sf::VideoMode videoMode;
+    };
 
+    GameSettings settings;
+    sf::RenderWindow window;
+    GameState state;
+    bool tokenSelected;
+    sf::Vector2i selectedPosition;
+    sf::Vector2i possibleMove;
+
+    bool gameWon = false;
+    sf::Text winText;
+    sf::RectangleShape winOverlay;
+    sf::Font font;
+
+    std::string player1Name;
+    std::string player2Name;
+
+    void handleTokenSelection(const sf::Vector2i &gridPos)
+    {
         try
         {
-            // Select token if it belongs to current player
-            Token *token = state.getBoard().getTokenAt(gridX, gridY);
-
-            if (token && token->getPlayer() == state.getCurrentPlayer().getPlayerNumber())
+            if (auto *token = state.getBoard().getTokenAt(gridPos.x, gridPos.y))
             {
-                tokenSelected = true;
-                selectedPosition = {gridX, gridY};
-
-                int dx = 0, dy = 0;
-                if (state.getCurrentPlayer().getPlayerNumber() == 0)
+                if (token->getPlayer() == state.getCurrentPlayer().getPlayerNumber())
                 {
-                    dx = 1;
-                }
-                else
-                {
-                    dy = 1;
-                }
-
-                possibleMove = state.getBoard().getTokenMove(gridX, gridY, gridX + dx, gridY + dy);
-            }
-            else if (gridX == possibleMove.first && gridY == possibleMove.second)
-            {
-
-                state.moveToken(
-                    selectedPosition.first,
-                    selectedPosition.second,
-                    possibleMove.first,
-                    possibleMove.second);
-
-                tokenSelected = false;
-                possibleMove = {-1, -1};
-
-                if (state.getCurrentPlayer().getScore() == MaxTokens)
-                {
-                    std::cout << "Player " << state.getCurrentPlayer().getPlayerNumber() << " wins!" << std::endl;
-                    window.close();
-                }
-
-                if (state.getOtherPlayer().getMovableTokens() == 0)
-                {
-                    std::cout << "Other Player has no more moves!" << std::endl;
-                }
-                else
-                {
-                    state.switchPlayer();
+                    tokenSelected = true;
+                    selectedPosition = gridPos;
+                    calculatePossibleMove(gridPos);
+                    return;
                 }
             }
-            else
-            {
-                tokenSelected = false;
-                possibleMove = {-1, -1};
-            }
+            resetSelection();
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Selection error: " << ex.what() << std::endl;
+            resetSelection();
+        }
+    }
+
+    void calculatePossibleMove(const sf::Vector2i &gridPos)
+    {
+        const int player = state.getCurrentPlayer().getPlayerNumber();
+        const sf::Vector2i direction(player == 0 ? 1 : 0, player == 1 ? 1 : 0);
+        auto pairMove = state.getBoard().getTokenMove(
+            gridPos.x, gridPos.y,
+            gridPos.x + direction.x,
+            gridPos.y + direction.y);
+        possibleMove = sf::Vector2i(pairMove.first, pairMove.second);
+    }
+
+    void handleTokenMove(const sf::Vector2i &gridPos)
+    {
+        try
+        {
+            state.moveToken(
+                selectedPosition.x, selectedPosition.y,
+                gridPos.x, gridPos.y);
+
+            checkWinCondition();
+            checkOtherPlayerMoves();
+
+            resetSelection();
         }
         catch (const std::exception &ex)
         {
             std::cerr << "Move error: " << ex.what() << std::endl;
-            tokenSelected = false;
+            resetSelection();
         }
+    }
+
+    void checkWinCondition()
+    {
+        if (state.getCurrentPlayer().getScore() >= settings.maxTokens)
+        {
+            gameWon = true;
+            setupWinScreen();
+        }
+    }
+
+    void setupWinScreen()
+    {
+        // Load font if not already loaded
+        if (!font.openFromFile("arial.ttf"))
+        {
+            std::cerr << "Error loading font for win screen!\n";
+            // Handle error
+        }
+
+        // Create dark overlay
+        winOverlay.setSize(sf::Vector2f(window.getSize()));
+        winOverlay.setFillColor(sf::Color(0, 0, 0, 200));
+
+        // Setup win text
+        winText.setFont(font);
+        winText.setCharacterSize(60);
+        winText.setFillColor(sf::Color::Yellow);
+        winText.setStyle(sf::Text::Bold);
+
+        // Use player names instead of numbers
+        std::string winnerName = state.getCurrentPlayer().getPlayerNumber() == 0
+                                     ? player1Name
+                                     : player2Name;
+        winText.setString(winnerName + " wins!");
+
+        // Center text
+        sf::FloatRect textRect = winText.getLocalBounds();
+        winText.setOrigin(sf::Vector2f(textRect.size.x / 2.0f,
+                                       textRect.size.y / 2.0f));
+        winText.setPosition(sf::Vector2f(
+            window.getSize().x / 2.0f, window.getSize().y / 2.0f));
+    }
+
+    void checkOtherPlayerMoves()
+    {
+        if (state.getOtherPlayer().getMovableTokens() == 0)
+        {
+            std::cout << "Other player has no valid moves!\n";
+            return;
+        }
+        state.switchPlayer();
+    }
+
+    void resetSelection()
+    {
+        tokenSelected = false;
+        selectedPosition = {-1, -1};
+        possibleMove = {-1, -1};
     }
 
     void handleEvents()
@@ -94,51 +157,61 @@ private:
 
             if (auto *mousePress = event->getIf<sf::Event::MouseButtonPressed>())
             {
-                handleMouseClick(mousePress->position.x, mousePress->position.y);
+                const auto mousePos = sf::Mouse::getPosition(window);
+                const sf::Vector2i gridPos(
+                    static_cast<int>(mousePos.x / settings.cellSize),
+                    static_cast<int>(mousePos.y / settings.cellSize));
+
+                if (tokenSelected && gridPos == possibleMove)
+                {
+                    handleTokenMove(gridPos);
+                }
+                else
+                {
+                    handleTokenSelection(gridPos);
+                }
             }
         }
     }
 
-    void render()
+    void renderSelection()
     {
-        window.clear();
-        state.getBoard().draw(window, cellSize, cellSize);
+        if (!tokenSelected)
+            return;
 
-        // Draw selection indicator
-        if (tokenSelected)
+        // Selected token indicator
+        sf::RectangleShape selection({settings.cellSize, settings.cellSize});
+        selection.setPosition(sf::Vector2f(
+            selectedPosition.x * settings.cellSize,
+            selectedPosition.y * settings.cellSize));
+        selection.setFillColor(sf::Color::Transparent);
+        selection.setOutlineColor(sf::Color::Yellow);
+        selection.setOutlineThickness(3);
+        window.draw(selection);
+
+        // Possible move indicator
+        if (possibleMove.x >= 0 && possibleMove.y >= 0)
         {
-            sf::RectangleShape selection(sf::Vector2f(cellSize, cellSize));
-            selection.setPosition(sf::Vector2f(
-                selectedPosition.first * cellSize,
-                selectedPosition.second * cellSize));
-            selection.setFillColor(sf::Color::Transparent);
-            selection.setOutlineColor(sf::Color::Yellow);
-            selection.setOutlineThickness(3);
-            window.draw(selection);
-
-            if (possibleMove.first != -1)
-            {
-                sf::CircleShape circle(cellSize / 4);
-                circle.setFillColor(sf::Color(128, 128, 128)); // Gray color
-                circle.setPosition(sf::Vector2f(
-                    possibleMove.first * cellSize + cellSize / 4,
-                    possibleMove.second * cellSize + cellSize / 4));
-
-                window.draw(circle);
-            }
+            sf::CircleShape indicator(settings.cellSize / 4);
+            indicator.setPosition(sf::Vector2f(
+                possibleMove.x * settings.cellSize + settings.cellSize / 4,
+                possibleMove.y * settings.cellSize + settings.cellSize / 4));
+            indicator.setFillColor(sf::Color(128, 128, 128, 180));
+            window.draw(indicator);
         }
-
-        window.display();
     }
 
 public:
-    GameManager()
-        : window(sf::VideoMode({600, 600}), "Game"),
-          cellSize(static_cast<float>(window.getSize().x) / Width),
-          state(static_cast<float>(window.getSize().x) / Width,
-                static_cast<float>(window.getSize().y) / Height),
-          tokenSelected(false)
+    GameManager(size_t gameSize, const std::string &player1, const std::string &player2)
+        : settings{
+              gameSize,
+              gameSize - 2,
+              static_cast<float>(600) / gameSize, // Cell size calculated from known window size
+              sf::VideoMode({600, 600})},
+          window(settings.videoMode, "Token Game"), state(settings.cellSize, settings.cellSize, gameSize), tokenSelected(false), winText(font, "", 30)
     {
+        player1Name = player1;
+        player2Name = player2;
         window.setFramerateLimit(60);
     }
 
@@ -147,7 +220,23 @@ public:
         while (window.isOpen())
         {
             handleEvents();
-            render();
+
+            window.clear(sf::Color::White);
+            state.getBoard().draw(window, settings.cellSize, settings.cellSize);
+            renderSelection();
+
+            if (gameWon)
+            {
+                window.draw(winOverlay);
+                window.draw(winText);
+            }
+
+            window.display();
+            if (gameWon)
+            {
+                sf::sleep(sf::seconds(3)); // Pause for 3 seconds before closing
+                window.close();
+            }
         }
     }
 };

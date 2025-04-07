@@ -1,8 +1,10 @@
 #include "objects/GameManager.h"
+#include "objects/MainMenu.h"
 
 int main()
 {
-    GameManager<5, 5, 3> gameManager;
-    gameManager.run();
+
+    MainMenu menu;
+    menu.run();
     return 0;
 }

@@ -1,44 +1,31 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include <vector>
 #include <iostream>
+#include <stdexcept>
 #include "Token.h"
 
-using namespace std;
-
-/**
- * Represents a player in the game.
- *
- * @tparam MaxTokens The maximum number of tokens a player can have.
- */
-template <size_t MaxTokens>
 class Player
 {
 private:
-    int playerNumber;         // Unique identifier for the player (e.g., 0 or 1)
-    Token *tokens[MaxTokens]; // Fixed-size array of pointers to tokens
-    size_t tokenCount;        // Number of tokens currently owned by the player
-    int score;                // Player's score
-    int movableTokens;        // Number of movable tokens
+    size_t MaxTokens;
+    int playerNumber;
+    std::vector<Token *> tokens;
+    int score;
+    int movableTokens;
 
 public:
-    // Default constructor
-    Player() : playerNumber(0), tokenCount(0)
-    {
-        // Initialize the tokens array to nullptr
-        for (size_t i = 0; i < MaxTokens; ++i)
-        {
-            tokens[i] = nullptr;
-        }
-    }
-
     // Constructor
-    Player(int number) : playerNumber(number), tokenCount(0), score(0)
+    Player(int number, size_t maxTokens)
+        : playerNumber(number), MaxTokens(maxTokens), score(0), movableTokens(MaxTokens) {}
+
+    // Destructor to clean up tokens
+    ~Player()
     {
-        // Initialize the tokens array to nullptr
-        for (size_t i = 0; i < MaxTokens; ++i)
+        for (auto token : tokens)
         {
-            tokens[i] = nullptr;
+            delete token;
         }
     }
 
@@ -51,15 +38,15 @@ public:
     // Add a token to the player's collection
     void addToken(Token *token)
     {
-        if (tokenCount >= MaxTokens)
+        if (tokens.size() >= MaxTokens)
         {
-            throw runtime_error("Cannot add more tokens: Maximum token limit reached.");
+            throw std::runtime_error("Cannot add more tokens: Maximum token limit reached.");
         }
-        tokens[tokenCount++] = token; // Add the token and increment the count
+        tokens.push_back(token);
     }
 
-    // Get the player's tokens
-    Token **getTokens()
+    // Get the player's tokens (const version)
+    const std::vector<Token *> &getTokens() const
     {
         return tokens;
     }
@@ -67,7 +54,7 @@ public:
     // Get the number of tokens owned by the player
     size_t getTokenCount() const
     {
-        return tokenCount;
+        return tokens.size();
     }
 
     // Get the player's score
@@ -97,14 +84,33 @@ public:
     // Check if the player has any movable tokens
     bool hasMovableTokens() const
     {
-        for (size_t i = 0; i < tokenCount; ++i)
+        for (const auto &token : tokens)
         {
-            if (tokens[i]->isMovable())
+            if (token->isMovable())
             {
                 return true;
             }
         }
         return false;
+    }
+
+    // Non-const version of getTokens for modification
+    std::vector<Token *> &getTokens()
+    {
+        return tokens;
+    }
+
+    // Update the movable tokens based on the game board
+    void updateMovableTokens()
+    {
+        movableTokens = 0;
+        for (auto &token : tokens)
+        {
+            if (token->isMovable())
+            {
+                ++movableTokens;
+            }
+        }
     }
 };
 

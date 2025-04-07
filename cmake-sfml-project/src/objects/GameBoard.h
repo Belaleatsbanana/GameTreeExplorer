@@ -2,47 +2,49 @@
 #define GAMEBOARD_H
 
 #include <SFML/Graphics.hpp>
+#include <vector>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
 #include "Token.h"
 
-template <size_t Width, size_t Height>
 class GameBoard
 {
 private:
-    Token *board[Width][Height];
+    size_t Width;
+    size_t Height;
+    std::vector<std::vector<Token *>> board;
     sf::Color borderColor = sf::Color::Black;
     unsigned borderThickness = 2;
 
-    sf::Color getCellColor(size_t row, size_t col)
+    bool isValidPosition(int x, int y) const
     {
-        // Corner cells
-        if ((row == 0 && col == 0) ||
-            (row == 0 && col == Width - 1) ||
-            (row == Height - 1 && col == 0) ||
-            (row == Height - 1 && col == Width - 1))
-        {
-            return {184, 176, 170}; // Gray
-        }
-        // Top/bottom borders
-        if (row == 0 || row == Height - 1)
-        {
-            return {210, 241, 210}; // Light green
-        }
-        // Left/right borders
-        if (col == 0 || col == Width - 1)
-        {
-            return {250, 210, 210}; // Light red
-        }
-        return sf::Color::White;
+        return x >= 0 && y >= 0 &&
+               static_cast<size_t>(x) < Width &&
+               static_cast<size_t>(y) < Height;
     }
 
-    void drawCell(sf::RenderWindow &window, size_t row, size_t col, float cellW, float cellH)
+    sf::Color getCellColor(size_t row, size_t col) const
     {
-        sf::RectangleShape cell(sf::Vector2f(
-            cellW - borderThickness,
-            cellH - borderThickness));
+        if (row >= Height || col >= Width)
+            return sf::Color::Black;
+
+        const bool isEdgeRow = (row == 0 || row == Height - 1);
+        const bool isEdgeCol = (col == 0 || col == Width - 1);
+
+        if (isEdgeRow && isEdgeCol)
+            return {184, 176, 170}; // Gray corners
+        if (isEdgeRow)
+            return {210, 241, 210}; // Green borders
+        if (isEdgeCol)
+            return {250, 210, 210}; // Red borders
+        return sf::Color::White;    // White cells
+    }
+
+    void drawCell(sf::RenderWindow &window, size_t row, size_t col,
+                  float cellW, float cellH) const
+    {
+        sf::RectangleShape cell({cellW - borderThickness, cellH - borderThickness});
         cell.setPosition(sf::Vector2f(
             col * cellW + borderThickness / 2.0f,
             row * cellH + borderThickness / 2.0f));
@@ -50,17 +52,13 @@ private:
         window.draw(cell);
     }
 
-    void drawGridLines(sf::RenderWindow &window, float cellW, float cellH)
+    void drawGridLines(sf::RenderWindow &window, float cellW, float cellH) const
     {
         // Vertical lines
         for (size_t col = 0; col <= Width; ++col)
         {
-            sf::RectangleShape line(sf::Vector2f(
-                static_cast<float>(borderThickness),
-                Height * cellH));
-            line.setPosition(sf::Vector2f(
-                col * cellW - borderThickness / 2.0f,
-                0.0f));
+            sf::RectangleShape line({static_cast<float>(borderThickness), Height * cellH});
+            line.setPosition(sf::Vector2f(col * cellW - borderThickness / 2.0f, 0.0f));
             line.setFillColor(borderColor);
             window.draw(line);
         }
@@ -68,61 +66,43 @@ private:
         // Horizontal lines
         for (size_t row = 0; row <= Height; ++row)
         {
-            sf::RectangleShape line(sf::Vector2f(
-                Width * cellW,
-                static_cast<float>(borderThickness)));
+            sf::RectangleShape line({Width * cellW, static_cast<float>(borderThickness)});
             line.setPosition(sf::Vector2f(
-                0.0f,
-                row * cellH - borderThickness / 2.0f));
+                0.0f, row * cellH - borderThickness / 2.0f));
             line.setFillColor(borderColor);
             window.draw(line);
         }
     }
 
-    void drawTokens(sf::RenderWindow &window, float cellW, float cellH)
+    void drawTokens(sf::RenderWindow &window, float cellW, float cellH) const
     {
         for (size_t row = 0; row < Height; ++row)
         {
             for (size_t col = 0; col < Width; ++col)
             {
-                if (board[col][row])
+                if (board[row][col])
                 {
-                    board[col][row]->draw(window, cellW, cellH);
+                    board[row][col]->draw(window, cellW, cellH);
                 }
             }
         }
     }
 
 public:
-    GameBoard()
-    {
-        for (auto &col : board)
-        {
-            for (auto &cell : col)
-            {
-                cell = nullptr;
-            }
-        }
-    }
+    GameBoard(size_t width, size_t height)
+        : Width(width), Height(height),
+          board(height, std::vector<Token *>(width, nullptr)) {}
+
+    GameBoard(const GameBoard &) = delete;
+    GameBoard &operator=(const GameBoard &) = delete;
 
     ~GameBoard()
     {
-        for (auto &col : board)
+        for (auto &row : board)
         {
-            for (auto &cell : col)
+            for (auto &cell : row)
             {
-                delete cell;
-            }
-        }
-    }
-
-    GameBoard(const GameBoard &other)
-    {
-        for (size_t i = 0; i < Width; ++i)
-        {
-            for (size_t j = 0; j < Height; ++j)
-            {
-                board[i][j] = other.board[i][j] ? new Token(*other.board[i][j]) : nullptr;
+                cell = nullptr;
             }
         }
     }
@@ -130,154 +110,156 @@ public:
     void placeToken(Token *token)
     {
         const auto [x, y] = token->getPosition();
-        board[x][y] = token;
+        if (!isValidPosition(x, y))
+        {
+            throw std::out_of_range("Invalid token position");
+        }
+        board[y][x] = token;
     }
 
     void moveToken(int fromX, int fromY, int toX, int toY)
     {
-        if (fromX < 0 || fromX >= Width || fromY < 0 || fromY >= Height ||
-            toX < 0 || toX >= Width || toY < 0 || toY >= Height)
+        if (!isValidPosition(fromX, fromY) || !isValidPosition(toX, toY))
         {
-            throw std::out_of_range("Invalid move coordinates");
+            throw std::out_of_range("Move coordinates out of bounds");
         }
-        if (!board[fromX][fromY])
-        {
+
+        size_t fX = fromX, fY = fromY;
+        size_t tX = toX, tY = toY;
+
+        if (!board[fY][fX])
             throw std::runtime_error("No token at source position");
-        }
-        if (board[toX][toY])
-        {
-            if (board[fromX][fromY]->getPlayer() == 0)
-            {
-                if (board[toX + 1][toY])
-                {
-                    throw std::runtime_error("Player 1 cannot jump over another token");
-                }
-                else
-                {
-                    toX++;
-                }
-            }
-            else if (board[fromX][fromY]->getPlayer() == 1)
-            {
-                if (board[toX][toY + 1])
-                {
-                    throw std::runtime_error("Player 2 cannot jump over another token");
-                }
-                else
-                {
-                    toY++;
-                }
-            }
-        }
-        if (!board[fromX][fromY]->isMovable())
+        Token *movingToken = board[fY][fX];
+
+        if (!movingToken->isMovable())
         {
             throw std::runtime_error("Token is immovable");
         }
 
-        board[toX][toY] = board[fromX][fromY];
-        board[fromX][fromY] = nullptr;
-        board[toX][toY]->move(toX, toY);
-
-        // Check if token has reached the end of the board
-        if (toX == 0 || toX == Width - 1 || toY == 0 || toY == Height - 1)
+        // Handle potential jumps
+        if (board[tY][tX])
         {
-            board[toX][toY]->tokenReachedEnd();
-        }
-    }
-
-    std::pair<int, int> getTokenMove(int fromX, int fromY, int toX, int toY)
-    {
-        if (fromX < 0 || fromX >= Width || fromY < 0 || fromY >= Height ||
-            toX < 0 || toX >= Width || toY < 0 || toY >= Height)
-        {
-            return {-1, -1};
-        }
-        if (!board[fromX][fromY])
-        {
-            throw std::runtime_error("No token at source position");
-        }
-        if (board[toX][toY])
-        {
-            if (board[fromX][fromY]->getPlayer() == 0)
-            {
-                if (board[toX + 1][toY])
-                {
-                    return {-1, -1};
-                }
-                else
-                {
-                    toX++;
-                }
-            }
-            else if (board[fromX][fromY]->getPlayer() == 1)
-            {
-                if (board[toX][toY + 1])
-                {
-                    return {-1, -1};
-                }
-                else
-                {
-                    toY++;
-                }
-            }
-        }
-        if (!board[fromX][fromY]->isMovable())
-        {
-            throw std::runtime_error("Token is immovable");
-        }
-        return {toX, toY};
-    }
-
-    bool canTokenMove(Token *token)
-    {
-
-        int player = token->getPlayer();
-
-        int toX, toY;
-        if (player == 0)
-        {
-            toX = token->getPosition().first + 1;
-            toY = token->getPosition().second;
-        }
-        else
-        {
-            toX = token->getPosition().first;
-            toY = token->getPosition().second + 1;
-        }
-
-        if (toX < 0 || toX >= Width || toY < 0 || toY >= Height)
-        {
-            return false;
-        }
-        if (board[toX][toY])
-        {
+            const int player = movingToken->getPlayer();
             if (player == 0)
             {
-                if (board[toX + 1][toY])
-                {
-                    return false;
-                }
-                else
-                {
-                    return true;
-                }
+                if (tX >= Width - 1 || board[tY][tX + 1])
+                    throw std::runtime_error("Can't jump");
+                tX++;
             }
             else if (player == 1)
             {
-                if (board[toX][toY + 1])
-                {
-                    return false;
-                }
-                else
-                {
-                    return true;
-                }
+                if (tY >= Height - 1 || board[tY + 1][tX])
+                    throw std::runtime_error("Can't jump");
+                tY++;
             }
         }
 
-        return true;
+        // Validate final position
+        if (!isValidPosition(tX, tY))
+        {
+            throw std::out_of_range("Jump moves out of bounds");
+        }
+
+        // Perform move
+        board[tY][tX] = movingToken;
+        board[fY][fX] = nullptr;
+        movingToken->move(tX, tY);
+        updateTokenMoveStatus();
+
+        // Check end condition
+        if (tX == 0 || tX == Width - 1 || tY == 0 || tY == Height - 1)
+        {
+            movingToken->tokenReachedEnd();
+        }
     }
-    void draw(sf::RenderWindow &window, float cellW, float cellH)
+
+    void updateTokenMoveStatus()
+    {
+        for (size_t row = 0; row < Height; ++row)
+        {
+            for (size_t col = 0; col < Width; ++col)
+            {
+                if (board[row][col])
+                {
+                    if (canTokenMove(board[row][col]))
+                    {
+                        board[row][col]->setMovable(true);
+                    }
+                    else
+                    {
+                        board[row][col]->setMovable(false);
+                    }
+                }
+            }
+        }
+    }
+
+    std::pair<int, int> getTokenMove(int fromX, int fromY, int toX, int toY) const
+    {
+        try
+        {
+            if (!isValidPosition(fromX, fromY) || !isValidPosition(toX, toY))
+            {
+                return {-1, -1};
+            }
+
+            const Token *token = board[fromY][fromX];
+            if (!token || !token->isMovable())
+                return {-1, -1};
+
+            // Check direct move
+            if (!board[toY][toX])
+                return {toX, toY};
+
+            // Handle jump possibility
+            const int player = token->getPlayer();
+            if (player == 0 && toX < Width - 1 && !board[toY][toX + 1])
+            {
+                return {toX + 1, toY};
+            }
+            if (player == 1 && toY < Height - 1 && !board[toY + 1][toX])
+            {
+                return {toX, toY + 1};
+            }
+
+            return {-1, -1};
+        }
+        catch (...)
+        {
+            return {-1, -1};
+        }
+    }
+
+    bool canTokenMove(const Token *token) const
+    {
+        const auto [x, y] = token->getPosition();
+        if (!isValidPosition(x, y))
+            return false;
+
+        const int player = token->getPlayer();
+        int dx = (player == 0) ? 1 : 0;
+        int dy = (player == 1) ? 1 : 0;
+
+        // Check basic move
+        if (!isValidPosition(x + dx, y + dy))
+            return false;
+        if (!board[y + dy][x + dx])
+            return true;
+
+        // Check jump possibility
+        if (player == 0 && x + 2 < Width)
+        {
+            return !board[y][x + 2];
+        }
+        if (player == 1 && y + 2 < Height)
+        {
+            return !board[y + 2][x];
+        }
+
+        return false;
+    }
+
+    void draw(sf::RenderWindow &window, float cellW, float cellH) const
     {
         // Draw cells
         for (size_t row = 0; row < Height; ++row)
@@ -297,9 +279,9 @@ public:
 
     void printBoard() const
     {
-        for (const auto &col : board)
+        for (const auto &row : board)
         {
-            for (const auto &cell : col)
+            for (const auto &cell : row)
             {
                 std::cout << (cell ? std::to_string(cell->getPlayer()) : ".") << " ";
             }
@@ -309,11 +291,9 @@ public:
 
     Token *getTokenAt(int x, int y) const
     {
-        if (x < 0 || x >= Width || y < 0 || y >= Height)
-        {
+        if (!isValidPosition(x, y))
             return nullptr;
-        }
-        return board[x][y];
+        return board[y][x];
     }
 };
 
