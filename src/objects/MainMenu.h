@@ -1,6 +1,7 @@
 #ifndef MAINMENU_H
 #define MAINMENU_H
 
+#include "GameManager.h"
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <SFML/System.hpp>
@@ -131,7 +132,7 @@ private:
     {
         try
         {
-            return std::stoi(boardSizeField.content.getString().toAnsiString());
+            return std::stoi(boardSizeField.content.getString().toAnsiString()) + 2;
         }
         catch (...)
         {
@@ -246,7 +247,7 @@ private:
         try
         {
             int size = std::stoi(boardSizeField.content.getString().toAnsiString());
-            setError(boardSizeField, size < 3 || size > 51);
+            setError(boardSizeField, size < 3);
         }
         catch (...)
         {

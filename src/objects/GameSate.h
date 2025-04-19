@@ -2,7 +2,9 @@
 #define GAMESTATE_H
 
 #include "Player.h"
+#include "Algo.h"
 #include "GameBoard.h"
+#include <iostream>
 #include <stdexcept>
 
 class GameState
@@ -41,8 +43,30 @@ public:
     }
 
     // Delete copy operations
-    GameState(const GameState &) = delete;
-    GameState &operator=(const GameState &) = delete;
+    // GameState(const GameState &) = delete;
+    // GameState &operator=(const GameState &) = delete;
+	GameState(const GameState& other) 
+		: MaxTokensPerPlayer(other.MaxTokensPerPlayer),
+		  board(other.board),  // Assumes GameBoard has a proper copy constructor
+		  player1(other.player1.getPlayerNumber(), other.MaxTokensPerPlayer),
+		  player2(other.player2.getPlayerNumber(), other.MaxTokensPerPlayer),
+		  currentPlayer(other.currentPlayer)
+	{
+		// Deep copy tokens for both players
+		for (size_t i = 0; i < other.player1.getTokens().size(); ++i) {
+			Token* original = other.player1.getTokens()[i];
+			Token* copy = new Token(*original);  // Assumes Token has a copy constructor
+			player1.addToken(copy);
+			board.placeToken(copy);  // Register with board
+		}
+
+		for (size_t i = 0; i < other.player2.getTokens().size(); ++i) {
+			Token* original = other.player2.getTokens()[i];
+			Token* copy = new Token(*original);  // Assumes Token has a copy constructor
+			player2.addToken(copy);
+			board.placeToken(copy);  // Register with board
+		}
+	}
 
     Player &getCurrentPlayer() { return currentPlayer == 0 ? player1 : player2; }
     Player &getOtherPlayer() { return currentPlayer == 0 ? player2 : player1; }
@@ -63,6 +87,7 @@ public:
         {
             if (token->hasReachedEnd())
             {
+				std::cout << "JOE MAMA" << std::endl;
                 getCurrentPlayer().setScore(getCurrentPlayer().getScore() + 1);
             }
         }

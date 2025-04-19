@@ -3,9 +3,18 @@
 #define GAMEMANAGER_H
 
 #include <SFML/Graphics.hpp>
+#include <SFML/System/Sleep.hpp>
+#include <SFML/System/Time.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Window/VideoMode.hpp>
 #include <iostream>
 #include <memory>
+#include <ostream>
+#include <queue>
+#include <stack>
+#include "Algo.h"
 #include "GameSate.h"
+#include "GameBoard.h"
 
 class GameManager
 {
@@ -32,6 +41,7 @@ private:
 
     std::string player1Name;
     std::string player2Name;
+	std::stack<algo::MoveStep> history;
 
     void handleTokenSelection(const sf::Vector2i &gridPos)
     {
@@ -146,8 +156,53 @@ private:
         possibleMove = {-1, -1};
     }
 
+	void handleBotTurn() {
+		std::queue<algo::MoveStep> visualizeMoves;
+		algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves, 0);	
+
+		algo::MoveStep nextStep;
+
+		const int base_delay_ms = 500;
+		const int base_grid = 3;
+		const float delay = (base_delay_ms * base_grid) / static_cast<float>(settings.size);
+
+		GameBoard fakeBoard(state.getBoard());
+		while (!visualizeMoves.empty()) {
+			auto i = visualizeMoves.front();
+			visualizeMoves.pop();
+			fakeBoard.moveTokenRaw(i.from.first, i.from.second, i.to.first, i.to.second);
+
+
+            window.clear(sf::Color::White);
+			state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
+			fakeBoard.draw(window, settings.cellSize, settings.cellSize, true);
+			window.display();
+			sf::sleep(sf::microseconds(static_cast<int>(delay)));
+		}
+
+		while (!history.empty()) {
+			auto i = history.top();
+			history.pop();
+			nextStep = i;
+		}
+
+		state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
+
+		state.moveToken(nextStep.from.first, nextStep.from.second, nextStep.to.first, nextStep.to.second);
+
+		checkWinCondition();
+		checkOtherPlayerMoves();
+		return;
+	}
+
     void handleEvents()
     {
+		if (state.getCurrentPlayer().getPlayerNumber() == 1)  {
+			handleBotTurn();
+			return;
+		}
+		
+
         while (auto event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>())
@@ -219,11 +274,15 @@ public:
     {
         while (window.isOpen())
         {
+			std::cout << "RUNNING NEW LOOOP" << std::endl;
             handleEvents();
-
+			std::cout << "FINSIHED EVENTS" << std::endl;
+			
             window.clear(sf::Color::White);
-            state.getBoard().draw(window, settings.cellSize, settings.cellSize);
+            state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
             renderSelection();
+
+			std::cout << "FINSIHED DRAWING" << std::endl;
 
             if (gameWon)
             {

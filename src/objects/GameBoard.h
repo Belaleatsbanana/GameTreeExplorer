@@ -2,10 +2,13 @@
 #define GAMEBOARD_H
 
 #include <SFML/Graphics.hpp>
+#include <cstdint>
+#include <string>
 #include <vector>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
+#include "Algo.h"
 #include "Token.h"
 
 class GameBoard
@@ -24,7 +27,7 @@ private:
                static_cast<size_t>(y) < Height;
     }
 
-    sf::Color getCellColor(size_t row, size_t col) const
+    sf::Color getCellColor(size_t row, size_t col, std::uint8_t opacity) const
     {
         if (row >= Height || col >= Width)
             return sf::Color::Black;
@@ -33,22 +36,22 @@ private:
         const bool isEdgeCol = (col == 0 || col == Width - 1);
 
         if (isEdgeRow && isEdgeCol)
-            return {184, 176, 170}; // Gray corners
+            return {184, 176, 170, opacity}; // Gray corners
         if (isEdgeRow)
-            return {210, 241, 210}; // Green borders
+            return {210, 241, 210, opacity}; // Green borders
         if (isEdgeCol)
-            return {250, 210, 210}; // Red borders
-        return sf::Color::White;    // White cells
+            return {250, 210, 210, opacity}; // Red borders
+        return {255, 255, 255, opacity};    // White cells
     }
 
     void drawCell(sf::RenderWindow &window, size_t row, size_t col,
-                  float cellW, float cellH) const
+                  float cellW, float cellH, int opacity) const
     {
         sf::RectangleShape cell({cellW - borderThickness, cellH - borderThickness});
         cell.setPosition(sf::Vector2f(
             col * cellW + borderThickness / 2.0f,
             row * cellH + borderThickness / 2.0f));
-        cell.setFillColor(getCellColor(row, col));
+        cell.setFillColor(getCellColor(row, col, opacity));
         window.draw(cell);
     }
 
@@ -74,7 +77,7 @@ private:
         }
     }
 
-    void drawTokens(sf::RenderWindow &window, float cellW, float cellH) const
+    void drawTokens(sf::RenderWindow &window, float cellW, float cellH, int opacity) const
     {
         for (size_t row = 0; row < Height; ++row)
         {
@@ -82,7 +85,7 @@ private:
             {
                 if (board[row][col])
                 {
-                    board[row][col]->draw(window, cellW, cellH);
+                    board[row][col]->draw(window, cellW, cellH, opacity);
                 }
             }
         }
@@ -93,8 +96,25 @@ public:
         : Width(width), Height(height),
           board(height, std::vector<Token *>(width, nullptr)) {}
 
-    GameBoard(const GameBoard &) = delete;
-    GameBoard &operator=(const GameBoard &) = delete;
+    // GameBoard(const GameBoard &) = delete;
+    // GameBoard &operator=(const GameBoard &) = delete;
+	GameBoard(const GameBoard& other) 
+		: Width(other.Width),
+		  Height(other.Height),
+		  board(other.Height, std::vector<Token*>(other.Width, nullptr)),
+		  borderColor(other.borderColor),
+		  borderThickness(other.borderThickness)
+	{
+		// Deep copy all tokens
+		for (size_t row = 0; row < Height; ++row) {
+			for (size_t col = 0; col < Width; ++col) {
+				if (other.board[row][col] != nullptr) {
+					// Create a new copy of the token
+					board[row][col] = new Token(*other.board[row][col]);
+				}
+			}
+		}
+	}
 
     ~GameBoard()
     {
@@ -116,6 +136,28 @@ public:
         }
         board[y][x] = token;
     }
+
+
+    void moveTokenRaw(int fromX, int fromY, int toX, int toY)
+    {
+        size_t fX = fromX, fY = fromY;
+        size_t tX = toX, tY = toY;
+
+        if (!board[fY][fX])
+            throw std::runtime_error("No token at source position");
+        Token *movingToken = board[fY][fX];
+
+        board[tY][tX] = movingToken;
+        board[fY][fX] = nullptr;
+        movingToken->move(tX, tY);
+		movingToken->undoReachedEnd();
+        updateTokenMoveStatus();
+
+        if (tX == 0 || tX == Width - 1 || tY == 0 || tY == Height - 1)
+        {
+            movingToken->tokenReachedEnd();
+        }    
+	}
 
     void moveToken(int fromX, int fromY, int toX, int toY)
     {
@@ -259,14 +301,14 @@ public:
         return false;
     }
 
-    void draw(sf::RenderWindow &window, float cellW, float cellH) const
+    void draw(sf::RenderWindow &window, float cellW, float cellH, bool preview) const
     {
         // Draw cells
         for (size_t row = 0; row < Height; ++row)
         {
             for (size_t col = 0; col < Width; ++col)
             {
-                drawCell(window, row, col, cellW, cellH);
+                drawCell(window, row, col, cellW, cellH, (preview ? 100 : 255 ));
             }
         }
 
@@ -274,10 +316,23 @@ public:
         drawGridLines(window, cellW, cellH);
 
         // Draw tokens
-        drawTokens(window, cellW, cellH);
+        drawTokens(window, cellW, cellH, ( preview ? 150 : 255 ));
     }
 
-    void printBoard() const
+    void printBoard(std::string indent) 
+    {
+        for (const auto &row : board)
+        {
+			cout << indent;
+            for (const auto &cell : row)
+            {
+                std::cout << (cell ? std::to_string(cell->getPlayer()) : ".") << " ";
+            }
+            std::cout << "\n";
+        }
+    }
+
+    void printBoard() 
     {
         for (const auto &row : board)
         {

@@ -45,6 +45,29 @@ public:
         // Calculate scaling to fit 90% of cell
     }
 
+	Token(const Token& other)
+		: position(other.position),
+		  player(other.player),
+		  canMove(other.canMove),
+		  texture(),  // Will be copied below
+		  sprite(texture),  // Initialize with our texture
+		  scaleFactor(other.scaleFactor),
+		  reachedEnd(other.reachedEnd)
+	{
+		// Copy the texture (SFML textures can't be directly copied)
+		// if (!texture.loadFromFile(other.texture.copyToImage())) {
+		// 	std::cerr << "Failed to copy texture" << std::endl;
+		// }
+		texture = other.texture;
+		
+		// Copy sprite properties
+		sprite.setTexture(texture, true);
+		sprite.setScale(other.sprite.getScale());
+		sprite.setOrigin(other.sprite.getOrigin());
+		sprite.setPosition(other.sprite.getPosition());
+		sprite.setColor(other.sprite.getColor());
+	}
+
     void updatePosition(float cellW, float cellH)
     {
         // Convert grid position to centered pixel coordinates
@@ -103,10 +126,18 @@ public:
         canMove = false;
     }
 
+	void undoReachedEnd() 
+	{
+		reachedEnd = false;
+
+		canMove = true;
+	}
+
     // Draw the token on the window
-    void draw(sf::RenderWindow &window, float cellWidth, float cellHeight)
+    void draw(sf::RenderWindow &window, float cellWidth, float cellHeight, int opacity)
     {
         updatePosition(cellWidth, cellHeight);
+		sprite.setColor(sf::Color(255, 255, 255, opacity));
         window.draw(sprite);
     }
 };
