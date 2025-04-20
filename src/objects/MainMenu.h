@@ -190,7 +190,7 @@ private:
                 const std::string player1Name = getPlayer1Name();
                 const std::string player2Name = getPlayer2Name();
 
-                GameManager gameManager(bSize, player1Name, player2Name);
+                GameManager gameManager(bSize, player1Name, player2Name, GameManager::VisualizationMode::GRAPH);
                 gameManager.run();
             }
         }

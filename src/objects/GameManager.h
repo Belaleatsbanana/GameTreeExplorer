@@ -7,6 +7,7 @@
 #include <SFML/System/Time.hpp>
 #include <SFML/Window/Event.hpp>
 #include <SFML/Window/VideoMode.hpp>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <ostream>
@@ -15,16 +16,26 @@
 #include "Algo.h"
 #include "GameSate.h"
 #include "GameBoard.h"
+#include "TreeVisualizer.h"
 
 class GameManager
 {
+public:
+	enum VisualizationMode {
+		NONE,
+		TOKEN,
+		GRAPH
+	};
+
 private:
+
     struct GameSettings
     {
         size_t size;
         size_t maxTokens;
         float cellSize;
         sf::VideoMode videoMode;
+		VisualizationMode visualizationMode;
     };
 
     GameSettings settings;
@@ -156,29 +167,44 @@ private:
         possibleMove = {-1, -1};
     }
 
+
 	void handleBotTurn() {
 		std::queue<algo::MoveStep> visualizeMoves;
-		algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves, 0);	
+		algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves);	
 
 		algo::MoveStep nextStep;
 
-		const int base_delay_ms = 500;
-		const int base_grid = 3;
-		const float delay = (base_delay_ms * base_grid) / static_cast<float>(settings.size);
+		if (settings.visualizationMode == GRAPH) {
+			TreeVisualizer visualizer(visualizeMoves);
+			visualizer.run();
+		} else if (settings.visualizationMode == TOKEN) {
+			GameBoard fakeBoard(state.getBoard());
 
-		GameBoard fakeBoard(state.getBoard());
-		while (!visualizeMoves.empty()) {
-			auto i = visualizeMoves.front();
-			visualizeMoves.pop();
-			fakeBoard.moveTokenRaw(i.from.first, i.from.second, i.to.first, i.to.second);
+			const int referenceGridSize = 5; // Baseline grid size (e.g., 5x5)
+			const sf::Time baseDelay = sf::milliseconds(10); // Delay for referenceGridSize
+
+			// Calculate scale factor (bigger grid → smaller delay)
+			float scaleFactor = static_cast<float>(referenceGridSize * referenceGridSize) / (settings.size * settings.size * visualizeMoves.size());
+			sf::Time dynamicDelay = sf::microseconds(static_cast<std::int64_t>(baseDelay.asMicroseconds() * scaleFactor));
+
+			while (!visualizeMoves.empty()) {
+				auto i = visualizeMoves.front();
+				visualizeMoves.pop();
+				fakeBoard.moveTokenRaw(i.from.first, i.from.second, i.to.first, i.to.second);
 
 
-            window.clear(sf::Color::White);
-			state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
-			fakeBoard.draw(window, settings.cellSize, settings.cellSize, true);
-			window.display();
-			sf::sleep(sf::microseconds(static_cast<int>(delay)));
+				window.clear(sf::Color::White);
+				state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
+				fakeBoard.draw(window, settings.cellSize, settings.cellSize, true);
+				window.display();
+
+				// Apply delay proportional to the distance
+				sf::sleep(dynamicDelay);
+			}
 		}
+
+
+
 
 		while (!history.empty()) {
 			auto i = history.top();
@@ -257,17 +283,18 @@ private:
     }
 
 public:
-    GameManager(size_t gameSize, const std::string &player1, const std::string &player2)
+    GameManager(size_t gameSize, const std::string &player1, const std::string &player2, VisualizationMode mode = NONE)
         : settings{
               gameSize,
               gameSize - 2,
               static_cast<float>(600) / gameSize, // Cell size calculated from known window size
-              sf::VideoMode({600, 600})},
+              sf::VideoMode({600, 600}),
+			  mode},
           window(settings.videoMode, "Token Game"), state(settings.cellSize, settings.cellSize, gameSize), tokenSelected(false), winText(font, "", 30)
     {
         player1Name = player1;
         player2Name = player2;
-        window.setFramerateLimit(60);
+        window.setFramerateLimit(120);
     }
 
     void run()

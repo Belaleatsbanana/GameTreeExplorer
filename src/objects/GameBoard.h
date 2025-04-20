@@ -77,7 +77,7 @@ private:
         }
     }
 
-    void drawTokens(sf::RenderWindow &window, float cellW, float cellH, int opacity) const
+    void drawTokens(sf::RenderWindow &window, float cellW, float cellH, bool preview) const
     {
         for (size_t row = 0; row < Height; ++row)
         {
@@ -85,7 +85,7 @@ private:
             {
                 if (board[row][col])
                 {
-                    board[row][col]->draw(window, cellW, cellH, opacity);
+                    board[row][col]->draw(window, cellW, cellH, preview);
                 }
             }
         }
@@ -308,7 +308,7 @@ public:
         {
             for (size_t col = 0; col < Width; ++col)
             {
-                drawCell(window, row, col, cellW, cellH, (preview ? 100 : 255 ));
+                drawCell(window, row, col, cellW, cellH, (preview ? 150 : 255 ));
             }
         }
 
@@ -316,7 +316,7 @@ public:
         drawGridLines(window, cellW, cellH);
 
         // Draw tokens
-        drawTokens(window, cellW, cellH, ( preview ? 150 : 255 ));
+        drawTokens(window, cellW, cellH, preview);
     }
 
     void printBoard(std::string indent) 

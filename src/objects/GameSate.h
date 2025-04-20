@@ -20,8 +20,8 @@ private:
     {
         for (size_t i = 0; i < MaxTokensPerPlayer; ++i)
         {
-            Token *token1 = new Token(0, i + 1, 0, "rtoken.png", cellW, cellH);
-            Token *token2 = new Token(i + 1, 0, 1, "gtoken.png", cellW, cellH);
+            Token *token1 = new Token(0, i + 1, 0, "rtoken.png", "rtokenAlt.png", cellW, cellH);
+            Token *token2 = new Token(i + 1, 0, 1, "gtoken.png", "gtokenAlt.png", cellW, cellH);
 
             player1.addToken(token1);
             player2.addToken(token2);
