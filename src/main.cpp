@@ -1,9 +1,7 @@
 #include "objects/GameManager.h"
 #include "objects/MainMenu.h"
 
-int main()
-{
-
+int main() {
     MainMenu menu;
     menu.run();
     return 0;

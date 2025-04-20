@@ -13,29 +13,23 @@
 #include <ostream>
 #include <queue>
 #include <stack>
+
 #include "Algo.h"
-#include "GameSate.h"
 #include "GameBoard.h"
+#include "GameState.h"
 #include "TreeVisualizer.h"
 
-class GameManager
-{
-public:
-	enum VisualizationMode {
-		NONE,
-		TOKEN,
-		GRAPH
-	};
+class GameManager {
+   public:
+    enum VisualizationMode { NONE, TOKEN, GRAPH };
 
-private:
-
-    struct GameSettings
-    {
+   private:
+    struct GameSettings {
         size_t size;
         size_t maxTokens;
         float cellSize;
         sf::VideoMode videoMode;
-		VisualizationMode visualizationMode;
+        VisualizationMode visualizationMode;
     };
 
     GameSettings settings;
@@ -52,16 +46,12 @@ private:
 
     std::string player1Name;
     std::string player2Name;
-	std::stack<algo::MoveStep> history;
+    std::stack<algo::MoveStep> history;
 
-    void handleTokenSelection(const sf::Vector2i &gridPos)
-    {
-        try
-        {
-            if (auto *token = state.getBoard().getTokenAt(gridPos.x, gridPos.y))
-            {
-                if (token->getPlayer() == state.getCurrentPlayer().getPlayerNumber())
-                {
+    void handleTokenSelection(const sf::Vector2i &gridPos) {
+        try {
+            if (auto *token = state.getBoard().getTokenAt(gridPos.x, gridPos.y)) {
+                if (token->getPlayer() == state.getCurrentPlayer().getPlayerNumber()) {
                     tokenSelected = true;
                     selectedPosition = gridPos;
                     calculatePossibleMove(gridPos);
@@ -69,59 +59,44 @@ private:
                 }
             }
             resetSelection();
-        }
-        catch (const std::exception &ex)
-        {
+        } catch (const std::exception &ex) {
             std::cerr << "Selection error: " << ex.what() << std::endl;
             resetSelection();
         }
     }
 
-    void calculatePossibleMove(const sf::Vector2i &gridPos)
-    {
+    void calculatePossibleMove(const sf::Vector2i &gridPos) {
         const int player = state.getCurrentPlayer().getPlayerNumber();
         const sf::Vector2i direction(player == 0 ? 1 : 0, player == 1 ? 1 : 0);
-        auto pairMove = state.getBoard().getTokenMove(
-            gridPos.x, gridPos.y,
-            gridPos.x + direction.x,
-            gridPos.y + direction.y);
+        auto pairMove = state.getBoard().getTokenMove(gridPos.x, gridPos.y, gridPos.x + direction.x,
+                                                      gridPos.y + direction.y);
         possibleMove = sf::Vector2i(pairMove.first, pairMove.second);
     }
 
-    void handleTokenMove(const sf::Vector2i &gridPos)
-    {
-        try
-        {
-            state.moveToken(
-                selectedPosition.x, selectedPosition.y,
-                gridPos.x, gridPos.y);
+    void handleTokenMove(const sf::Vector2i &gridPos) {
+        try {
+            state.moveToken(selectedPosition.x, selectedPosition.y, gridPos.x, gridPos.y);
 
             checkWinCondition();
             checkOtherPlayerMoves();
 
             resetSelection();
-        }
-        catch (const std::exception &ex)
-        {
+        } catch (const std::exception &ex) {
             std::cerr << "Move error: " << ex.what() << std::endl;
             resetSelection();
         }
     }
 
-    void checkWinCondition()
-    {
-        if (state.getCurrentPlayer().getScore() >= settings.maxTokens)
-        {
+    void checkWinCondition() {
+        if (state.getCurrentPlayer().getScore() >= settings.maxTokens) {
             gameWon = true;
             setupWinScreen();
         }
     }
 
-    void setupWinScreen()
-    {
+    void setupWinScreen() {
         // Load font if not already loaded
-        if (!font.openFromFile("arial.ttf"))
-        {
+        if (!font.openFromFile("arial.ttf")) {
             std::cerr << "Error loading font for win screen!\n";
             // Handle error
         }
@@ -137,190 +112,167 @@ private:
         winText.setStyle(sf::Text::Bold);
 
         // Use player names instead of numbers
-        std::string winnerName = state.getCurrentPlayer().getPlayerNumber() == 0
-                                     ? player1Name
-                                     : player2Name;
+        std::string winnerName =
+            state.getCurrentPlayer().getPlayerNumber() == 0 ? player1Name : player2Name;
         winText.setString(winnerName + " wins!");
 
         // Center text
         sf::FloatRect textRect = winText.getLocalBounds();
-        winText.setOrigin(sf::Vector2f(textRect.size.x / 2.0f,
-                                       textRect.size.y / 2.0f));
-        winText.setPosition(sf::Vector2f(
-            window.getSize().x / 2.0f, window.getSize().y / 2.0f));
+        winText.setOrigin(sf::Vector2f(textRect.size.x / 2.0f, textRect.size.y / 2.0f));
+        winText.setPosition(sf::Vector2f(window.getSize().x / 2.0f, window.getSize().y / 2.0f));
     }
 
-    void checkOtherPlayerMoves()
-    {
-        if (state.getOtherPlayer().getMovableTokens() == 0)
-        {
+    void checkOtherPlayerMoves() {
+        if (state.getOtherPlayer().getMovableTokens() == 0) {
             std::cout << "Other player has no valid moves!\n";
             return;
         }
         state.switchPlayer();
     }
 
-    void resetSelection()
-    {
+    void resetSelection() {
         tokenSelected = false;
         selectedPosition = {-1, -1};
         possibleMove = {-1, -1};
     }
 
+    void handleBotTurn() {
+        std::queue<algo::MoveStep> visualizeMoves;
+        algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves);
 
-	void handleBotTurn() {
-		std::queue<algo::MoveStep> visualizeMoves;
-		algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves);	
+        algo::MoveStep nextStep;
 
-		algo::MoveStep nextStep;
+        if (settings.visualizationMode == GRAPH) {
+            TreeVisualizer visualizer(visualizeMoves);
+            visualizer.run();
+        } else if (settings.visualizationMode == TOKEN) {
+            GameBoard fakeBoard(state.getBoard());
 
-		if (settings.visualizationMode == GRAPH) {
-			TreeVisualizer visualizer(visualizeMoves);
-			visualizer.run();
-		} else if (settings.visualizationMode == TOKEN) {
-			GameBoard fakeBoard(state.getBoard());
+            const int referenceGridSize = 5;                  // Baseline grid size (e.g., 5x5)
+            const sf::Time baseDelay = sf::milliseconds(10);  // Delay for referenceGridSize
 
-			const int referenceGridSize = 5; // Baseline grid size (e.g., 5x5)
-			const sf::Time baseDelay = sf::milliseconds(10); // Delay for referenceGridSize
+            // Calculate scale factor (bigger grid → smaller delay)
+            float scaleFactor = static_cast<float>(referenceGridSize * referenceGridSize) /
+                                (settings.size * settings.size * visualizeMoves.size());
+            sf::Time dynamicDelay = sf::microseconds(
+                static_cast<std::int64_t>(baseDelay.asMicroseconds() * scaleFactor));
 
-			// Calculate scale factor (bigger grid → smaller delay)
-			float scaleFactor = static_cast<float>(referenceGridSize * referenceGridSize) / (settings.size * settings.size * visualizeMoves.size());
-			sf::Time dynamicDelay = sf::microseconds(static_cast<std::int64_t>(baseDelay.asMicroseconds() * scaleFactor));
+            while (!visualizeMoves.empty()) {
+                auto i = visualizeMoves.front();
+                visualizeMoves.pop();
+                fakeBoard.moveTokenRaw(i.from.first, i.from.second, i.to.first, i.to.second);
 
-			while (!visualizeMoves.empty()) {
-				auto i = visualizeMoves.front();
-				visualizeMoves.pop();
-				fakeBoard.moveTokenRaw(i.from.first, i.from.second, i.to.first, i.to.second);
+                window.clear(sf::Color::White);
+                state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
+                fakeBoard.draw(window, settings.cellSize, settings.cellSize, true);
+                window.display();
 
+                // Apply delay proportional to the distance
+                sf::sleep(dynamicDelay);
+            }
+        }
 
-				window.clear(sf::Color::White);
-				state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
-				fakeBoard.draw(window, settings.cellSize, settings.cellSize, true);
-				window.display();
+        while (!history.empty()) {
+            auto i = history.top();
+            history.pop();
+            nextStep = i;
+        }
 
-				// Apply delay proportional to the distance
-				sf::sleep(dynamicDelay);
-			}
-		}
+        state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
+        window.display();
 
-		while (!history.empty()) {
-			auto i = history.top();
-			history.pop();
-			nextStep = i;
-		}
+        sf::sleep(sf::seconds(0.2));
 
-		state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
-		window.display();
+        state.moveToken(nextStep.from.first, nextStep.from.second, nextStep.to.first,
+                        nextStep.to.second);
 
-		sf::sleep(sf::seconds(0.2));
+        checkWinCondition();
+        checkOtherPlayerMoves();
+        return;
+    }
 
-		state.moveToken(nextStep.from.first, nextStep.from.second, nextStep.to.first, nextStep.to.second);
+    void handleEvents() {
+        if (state.getCurrentPlayer().getPlayerNumber() == 1) {
+            handleBotTurn();
+            return;
+        }
 
-		checkWinCondition();
-		checkOtherPlayerMoves();
-		return;
-	}
-
-    void handleEvents()
-    {
-		if (state.getCurrentPlayer().getPlayerNumber() == 1)  {
-			handleBotTurn();
-			return;
-		}
-		
-
-        while (auto event = window.pollEvent())
-        {
-            if (event->is<sf::Event::Closed>())
-            {
+        while (auto event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
                 window.close();
             }
 
-            if (auto *mousePress = event->getIf<sf::Event::MouseButtonPressed>())
-            {
+            if (auto *mousePress = event->getIf<sf::Event::MouseButtonPressed>()) {
                 const auto mousePos = sf::Mouse::getPosition(window);
-                const sf::Vector2i gridPos(
-                    static_cast<int>(mousePos.x / settings.cellSize),
-                    static_cast<int>(mousePos.y / settings.cellSize));
+                const sf::Vector2i gridPos(static_cast<int>(mousePos.x / settings.cellSize),
+                                           static_cast<int>(mousePos.y / settings.cellSize));
 
-                if (tokenSelected && gridPos == possibleMove)
-                {
+                if (tokenSelected && gridPos == possibleMove) {
                     handleTokenMove(gridPos);
-                }
-                else
-                {
+                } else {
                     handleTokenSelection(gridPos);
                 }
             }
         }
     }
 
-    void renderSelection()
-    {
-        if (!tokenSelected)
-            return;
+    void renderSelection() {
+        if (!tokenSelected) return;
 
         // Selected token indicator
         sf::RectangleShape selection({settings.cellSize, settings.cellSize});
-        selection.setPosition(sf::Vector2f(
-            selectedPosition.x * settings.cellSize,
-            selectedPosition.y * settings.cellSize));
+        selection.setPosition(sf::Vector2f(selectedPosition.x * settings.cellSize,
+                                           selectedPosition.y * settings.cellSize));
         selection.setFillColor(sf::Color::Transparent);
         selection.setOutlineColor(sf::Color::Yellow);
         selection.setOutlineThickness(3);
         window.draw(selection);
 
         // Possible move indicator
-        if (possibleMove.x >= 0 && possibleMove.y >= 0)
-        {
+        if (possibleMove.x >= 0 && possibleMove.y >= 0) {
             sf::CircleShape indicator(settings.cellSize / 4);
-            indicator.setPosition(sf::Vector2f(
-                possibleMove.x * settings.cellSize + settings.cellSize / 4,
-                possibleMove.y * settings.cellSize + settings.cellSize / 4));
+            indicator.setPosition(
+                sf::Vector2f(possibleMove.x * settings.cellSize + settings.cellSize / 4,
+                             possibleMove.y * settings.cellSize + settings.cellSize / 4));
             indicator.setFillColor(sf::Color(128, 128, 128, 180));
             window.draw(indicator);
         }
     }
 
-public:
-    GameManager(size_t gameSize, const std::string &player1, const std::string &player2, VisualizationMode mode = NONE)
-        : settings{
-              gameSize,
-              gameSize - 2,
-              static_cast<float>(600) / gameSize, // Cell size calculated from known window size
-              sf::VideoMode({600, 600}),
-			  mode},
-          window(settings.videoMode, "Token Game"), state(settings.cellSize, settings.cellSize, gameSize), tokenSelected(false), winText(font, "", 30)
-    {
+   public:
+    GameManager(size_t gameSize, const std::string &player1, const std::string &player2,
+                VisualizationMode mode = NONE)
+        : settings{gameSize, gameSize - 2, static_cast<float>(600) / gameSize,
+                   sf::VideoMode({600, 600}), mode},
+          window(settings.videoMode, "Token Game"),
+          state(settings.cellSize, settings.cellSize, gameSize),
+          tokenSelected(false),
+          winText(font, "", 30) {
         player1Name = player1;
         player2Name = player2;
         window.setFramerateLimit(120);
     }
 
-    void run()
-    {
-        while (window.isOpen())
-        {
+    void run() {
+        while (window.isOpen()) {
             handleEvents();
-			
+
             window.clear(sf::Color::White);
             state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
             renderSelection();
 
-            if (gameWon)
-            {
+            if (gameWon) {
                 window.draw(winOverlay);
                 window.draw(winText);
             }
 
             window.display();
-            if (gameWon)
-            {
-                sf::sleep(sf::seconds(3)); // Pause for 3 seconds before closing
+            if (gameWon) {
+                sf::sleep(sf::seconds(3));
                 window.close();
             }
         }
     }
 };
 
-#endif // GAMEMANAGER_H
+#endif  // GAMEMANAGER_H

@@ -1,51 +1,48 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include <iostream>
 #include <SFML/Graphics.hpp>
+#include <iostream>
 using namespace std;
 
-class Token
-{
-private:
-    std::pair<int, int> position; // Position on the board
-    int player;                   // Player who owns the token
-    bool canMove;                 // Whether the token can move
-    sf::Texture texture;          // Texture for the token's image
-    sf::Sprite sprite;            // Sprite for the token
-    sf::Texture altTexture;          // Texture for the token's image
-    sf::Sprite altSprite;            // Sprite for the token
-    float scaleFactor;            // Scale factor for the token
+class Token {
+   private:
+    std::pair<int, int> position;  // Position on the board
+    int player;                    // Player who owns the token
+    bool canMove;                  // Whether the token can move
+    sf::Texture texture;           // Texture for the token's image
+    sf::Sprite sprite;             // Sprite for the token
+    sf::Texture altTexture;        // Texture for the token's image
+    sf::Sprite altSprite;          // Sprite for the token
+    float scaleFactor;             // Scale factor for the token
     bool reachedEnd = false;
 
-public:
+   public:
     // Constructor with coordinates
-    Token(int x, int y, int player, const std::string &imagePath, const std::string &altImagePath, float cellW, float cellH)
+    Token(int x, int y, int player, const std::string &imagePath, const std::string &altImagePath,
+          float cellW, float cellH)
         : position(make_pair(x, y)),
           player(player),
           canMove(true),
           texture(),
-		  altTexture(),
-		  altSprite(altTexture),
-          sprite(texture) // Initialize sprite with the texture
+          altTexture(),
+          altSprite(altTexture),
+          sprite(texture)  // Initialize sprite with the texture
     {
-        if (!texture.loadFromFile(imagePath))
-        {
+        if (!texture.loadFromFile(imagePath)) {
             std::cerr << "Failed to load texture: " << imagePath << std::endl;
         }
-        sprite.setTexture(texture, true); // Update sprite with the loaded texture
-                                          // Get original texture size
+        sprite.setTexture(texture, true);  // Update sprite with the loaded
+                                           // texture Get original texture size
         sf::Vector2u texSize = texture.getSize();
 
-		if (!altTexture.loadFromFile(altImagePath))
-		{
-			std::cerr << "Failed to load texture: " << altImagePath << std::endl; 
-		}
-		altSprite.setTexture(altTexture, true);
+        if (!altTexture.loadFromFile(altImagePath)) {
+            std::cerr << "Failed to load texture: " << altImagePath << std::endl;
+        }
+        altSprite.setTexture(altTexture, true);
 
-        scaleFactor = std::min(
-            (cellW) / static_cast<float>(texSize.x),
-            (cellH) / static_cast<float>(texSize.y));
+        scaleFactor = std::min((cellW) / static_cast<float>(texSize.x),
+                               (cellH) / static_cast<float>(texSize.y));
 
         // Apply scaling
         sprite.setScale(sf::Vector2f(scaleFactor, scaleFactor));
@@ -57,42 +54,39 @@ public:
         // Calculate scaling to fit 90% of cell
     }
 
-	Token(const Token& other)
-		: position(other.position),
-		  player(other.player),
-		  canMove(other.canMove),
-		  texture(),  // Will be copied below
-		  sprite(texture),  // Initialize with our texture
-		  altTexture(),
-		  altSprite(altTexture),
-		  scaleFactor(other.scaleFactor),
-		  reachedEnd(other.reachedEnd)
-	{
-		// Copy the texture (SFML textures can't be directly copied)
-		// if (!texture.loadFromFile(other.texture.copyToImage())) {
-		// 	std::cerr << "Failed to copy texture" << std::endl;
-		// }
-		texture = other.texture;
-		altTexture = other.altTexture;
+    Token(const Token &other)
+        : position(other.position),
+          player(other.player),
+          canMove(other.canMove),
+          texture(),        // Will be copied below
+          sprite(texture),  // Initialize with our texture
+          altTexture(),
+          altSprite(altTexture),
+          scaleFactor(other.scaleFactor),
+          reachedEnd(other.reachedEnd) {
+        // Copy the texture (SFML textures can't be directly copied)
+        // if (!texture.loadFromFile(other.texture.copyToImage())) {
+        // 	std::cerr << "Failed to copy texture" << std::endl;
+        // }
+        texture = other.texture;
+        altTexture = other.altTexture;
 
-		// Copy sprite properties
-		sprite.setTexture(texture, true);
-		sprite.setScale(other.sprite.getScale());
-		sprite.setOrigin(other.sprite.getOrigin());
-		sprite.setPosition(other.sprite.getPosition());
-		sprite.setColor(other.sprite.getColor());
+        // Copy sprite properties
+        sprite.setTexture(texture, true);
+        sprite.setScale(other.sprite.getScale());
+        sprite.setOrigin(other.sprite.getOrigin());
+        sprite.setPosition(other.sprite.getPosition());
+        sprite.setColor(other.sprite.getColor());
 
-		// Copy alt sprite properties
-		altSprite.setTexture(altTexture, true);
-		altSprite.setScale(other.altSprite.getScale());
-		altSprite.setOrigin(other.altSprite.getOrigin());
-		altSprite.setPosition(other.altSprite.getPosition());
-		altSprite.setColor(other.altSprite.getColor());
-		
-	}
+        // Copy alt sprite properties
+        altSprite.setTexture(altTexture, true);
+        altSprite.setScale(other.altSprite.getScale());
+        altSprite.setOrigin(other.altSprite.getOrigin());
+        altSprite.setPosition(other.altSprite.getPosition());
+        altSprite.setColor(other.altSprite.getColor());
+    }
 
-    void updatePosition(float cellW, float cellH)
-    {
+    void updatePosition(float cellW, float cellH) {
         // Convert grid position to centered pixel coordinates
         float posX = (position.first + 0.5f) * cellW;
         float posY = (position.second + 0.5f) * cellH;
@@ -101,74 +95,50 @@ public:
     }
 
     // Get the position of the token
-    pair<int, int> getPosition() const
-    {
-        return position;
-    }
+    pair<int, int> getPosition() const { return position; }
 
     // Set the position of the token
-    void setPosition(int x, int y)
-    {
-        position = make_pair(x, y);
-    }
+    void setPosition(int x, int y) { position = make_pair(x, y); }
 
     // Get the player who owns the token
-    int getPlayer() const
-    {
-        return player;
-    }
+    int getPlayer() const { return player; }
 
     // Check if the token can move
-    bool isMovable() const
-    {
-        return canMove;
-    }
+    bool isMovable() const { return canMove; }
 
     // Set the token to be movable
-    void setMovable(bool movable)
-    {
-        canMove = movable;
-    }
+    void setMovable(bool movable) { canMove = movable; }
 
     // Move the token to a new position
-    void move(int x, int y)
-    {
-        setPosition(x, y);
-    }
+    void move(int x, int y) { setPosition(x, y); }
 
     // Check if the token has reached the end of the board
-    bool hasReachedEnd() const
-    {
-        return reachedEnd;
-    }
+    bool hasReachedEnd() const { return reachedEnd; }
 
     // Set the token as having reached the end of the board
-    void tokenReachedEnd()
-    {
+    void tokenReachedEnd() {
         reachedEnd = true;
 
         canMove = false;
     }
 
-	void undoReachedEnd() 
-	{
-		reachedEnd = false;
+    void undoReachedEnd() {
+        reachedEnd = false;
 
-		canMove = true;
-	}
+        canMove = true;
+    }
 
     // Draw the token on the window
-    void draw(sf::RenderWindow &window, float cellWidth, float cellHeight, bool preview)
-    {
+    void draw(sf::RenderWindow &window, float cellWidth, float cellHeight, bool preview) {
         updatePosition(cellWidth, cellHeight);
-		if (preview) {
-			altSprite.setColor(sf::Color(255, 255, 255, 150));
-			window.draw(altSprite);
-		} else {
-			sprite.setColor(sf::Color(255, 255, 255, 255));
-			window.draw(sprite);
-		}
+        if (preview) {
+            altSprite.setColor(sf::Color(255, 255, 255, 150));
+            window.draw(altSprite);
+        } else {
+            sprite.setColor(sf::Color(255, 255, 255, 255));
+            window.draw(sprite);
+        }
     }
 };
 
-#endif // TOKEN_H
+#endif  // TOKEN_H
