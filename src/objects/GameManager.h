@@ -203,9 +203,6 @@ private:
 			}
 		}
 
-
-
-
 		while (!history.empty()) {
 			auto i = history.top();
 			history.pop();
@@ -213,6 +210,9 @@ private:
 		}
 
 		state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
+		window.display();
+
+		sf::sleep(sf::seconds(0.2));
 
 		state.moveToken(nextStep.from.first, nextStep.from.second, nextStep.to.first, nextStep.to.second);
 
@@ -301,15 +301,11 @@ public:
     {
         while (window.isOpen())
         {
-			std::cout << "RUNNING NEW LOOOP" << std::endl;
             handleEvents();
-			std::cout << "FINSIHED EVENTS" << std::endl;
 			
             window.clear(sf::Color::White);
             state.getBoard().draw(window, settings.cellSize, settings.cellSize, false);
             renderSelection();
-
-			std::cout << "FINSIHED DRAWING" << std::endl;
 
             if (gameWon)
             {

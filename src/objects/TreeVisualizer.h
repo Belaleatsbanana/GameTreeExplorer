@@ -18,7 +18,19 @@
 // Constants for visualization
 const int WINDOW_WIDTH = 1200; // Increased width for potentially wider trees
 const int WINDOW_HEIGHT = 1200;
-const int NODE_RADIUS = 8;
+
+const int MIN_NODE_RADIUS = 2;
+const int MAX_NODE_RADIUS = 12;
+const int DEFAULT_NODE_RADIUS = 12;
+
+const float MIN_LEVEL_HEIGHT = 20.0f;
+const float MAX_LEVEL_HEIGHT = 80.0f;
+const float DEFAULT_LEVEL_HEIGHT = 40.0f;
+ 
+const float MIN_HORIZONTAL_SPACING = (MIN_NODE_RADIUS * 2) + 20.0f;
+const float MAX_HORIZONTAL_SPACING = 120.0f;
+const float DEFAULT_HORIZONTAL_SPACING = 60.0f;
+
 // Define player colors - assuming player numbers are 0 and 1
 const sf::Color PLAYER_COLORS[] = {sf::Color::Green, sf::Color::Red}; // Player 0: Blue, Player 1: Red
 
@@ -58,8 +70,9 @@ private:
     std::vector<std::vector<VisualTreeNode*>> nodesAtDepth;
 
     // Layout parameters - these will be adjusted
-    float levelHeight = 20.0f;     // Vertical spacing between levels
-    float horizontalSpacing = 50.0f; // Base horizontal spacing between nodes at the same level
+    float levelHeight = DEFAULT_LEVEL_HEIGHT;     // Vertical spacing between levels
+    float horizontalSpacing = DEFAULT_HORIZONTAL_SPACING; // Base horizontal spacing between nodes at the same level
+	int nodeRadius = DEFAULT_NODE_RADIUS;
     float startX = WINDOW_WIDTH / 2.0f; // X position for the root node (center of the window)
     float startY = 20.0f;        // Y position for the root node (near the top)
 
@@ -122,22 +135,10 @@ public:
             if (timeAccumulator >= animationSpeed && !visualQueue.empty()) {
                 timeAccumulator = 0; // Reset the accumulator
                 processNextStep(); // Process one move/revert step from the queue
-                // adjustLayout(); // Call the layout adjustment function
+                adjustLayout(); // Call the layout adjustment function
             } else if (visualQueue.empty()) {
-				adjustLayout();
-				window.clear(sf::Color::White); // Clear the window with a background color (white)
-
-				drawTree(root); // Draw the current state of the dynamically built tree starting from the root
-				drawCurrentNodeHighlight(); // Draw a highlight around the node currently being visited
-
-				// Draw information about the step being processed (or the next one in the queue)
-				drawMoveInfo();
-
-				window.display(); // Display the drawn elements on the window
-                // Keep displaying the final state of the tree for a few seconds before closing.
-                 sf::sleep(sf::seconds(3.0)); // Display the final tree state for 3 seconds
+                 sf::sleep(sf::seconds(1.0)); // Display the final tree state for 3 seconds
                  window.close(); // Close the window after the delay
-                 // Alternatively, you could add logic here to wait for user input to close the window.
             }
 
             // --- Drawing ---
@@ -288,9 +289,9 @@ private: // Helper methods for visualization logic and drawing
 
     // Draws a single node (a circle with optional text)
     void drawNode(VisualTreeNode* node) {
-        sf::CircleShape shape(NODE_RADIUS);
+        sf::CircleShape shape(nodeRadius);
         // Position the circle shape. Its origin is top-left by default, so subtract radius to center it on the node's position.
-        shape.setPosition(node->position - sf::Vector2f(NODE_RADIUS, NODE_RADIUS));
+        shape.setPosition(node->position - sf::Vector2f(nodeRadius, nodeRadius));
 
         // Set the fill color of the node based on the player number (or depth, etc.)
         // Assuming playerNumber is 0 or 1. Root node has playerNumber -1.
@@ -327,9 +328,9 @@ private: // Helper methods for visualization logic and drawing
     // Draws a highlight circle around the currently active node
     void drawCurrentNodeHighlight() {
         if (currentNode) {
-            sf::CircleShape highlight(NODE_RADIUS + 3); // Create a slightly larger circle for the highlight
+            sf::CircleShape highlight(nodeRadius + 3); // Create a slightly larger circle for the highlight
             // Position the highlight circle, centered on the currentNode's position
-            highlight.setPosition(currentNode->position - sf::Vector2f(NODE_RADIUS + 3, NODE_RADIUS + 3));
+            highlight.setPosition(currentNode->position - sf::Vector2f(nodeRadius + 3, nodeRadius + 3));
             highlight.setFillColor(sf::Color::Yellow); // Set the highlight color to yellow
             window.draw(highlight); // Draw the highlight circle
         }
@@ -364,7 +365,7 @@ private: // Helper methods for visualization logic and drawing
         window.draw(infoText); // Draw the information text
     }
 
-    // Function to adjust layout based on the maximum depth and width of the tree
+	// Function to adjust layout based on the maximum depth and width of the tree
     void adjustLayout() {
         // Calculate the maximum depth reached in the tree.
         // nodesAtDepth.size() gives the number of levels (depth 0 is the first level).
@@ -372,7 +373,6 @@ private: // Helper methods for visualization logic and drawing
         int maxDepth = nodesAtDepth.empty() ? 0 : nodesAtDepth.size() - 1;
 
         // The maximum number of nodes at any single depth is tracked in maxNodesAtAnyDepth.
-        // We can also verify this by iterating through nodesAtDepth, but the member variable should be correct.
         int widestLevelNodeCount = maxNodesAtAnyDepth;
 
         // Define padding for the window edges
@@ -383,12 +383,22 @@ private: // Helper methods for visualization logic and drawing
         if (maxDepth > 0) {
             // Available vertical space is WINDOW_HEIGHT minus padding. Divide by maxDepth to get spacing between levels.
             levelHeight = (WINDOW_HEIGHT - verticalPadding) / static_cast<float>(maxDepth);
-            // Ensure a minimum level height to prevent nodes from being too close
-            if (levelHeight < 50.0f) levelHeight = 40.0f; // Minimum vertical spacing
+			if (levelHeight < MIN_LEVEL_HEIGHT)
+				levelHeight = MIN_LEVEL_HEIGHT;
+			if (levelHeight > MAX_LEVEL_HEIGHT)
+				levelHeight = MAX_LEVEL_HEIGHT;
+            // // Ensure a minimum level height to prevent nodes from being too close
+            // if (levelHeight < 50.0f) levelHeight = 50.0f; // Minimum vertical spacing
         } else {
             // If maxDepth is 0 (only root node), use a default level height
-            levelHeight = 100.0f;
+            levelHeight = DEFAULT_LEVEL_HEIGHT;
         }
+
+		nodeRadius = levelHeight / 2.5f; // Example: radius is about 40% of level height
+		if (nodeRadius < MIN_NODE_RADIUS)
+			nodeRadius = MIN_NODE_RADIUS;
+		if (nodeRadius > MAX_NODE_RADIUS)
+			nodeRadius = MAX_NODE_RADIUS;
 
         // Calculate the new horizontal spacing to fit the widest level horizontally
         if (widestLevelNodeCount > 1) {
@@ -396,44 +406,57 @@ private: // Helper methods for visualization logic and drawing
             // Divide by (widestLevelNodeCount - 1) to get spacing between the centers of nodes at the widest level.
             horizontalSpacing = (WINDOW_WIDTH - horizontalPadding) / static_cast<float>(widestLevelNodeCount - 1);
             // Ensure a minimum horizontal spacing
-            if (horizontalSpacing < 40.0f) horizontalSpacing = 40.0f; // Minimum horizontal spacing
+            if (horizontalSpacing < MIN_HORIZONTAL_SPACING) 
+				horizontalSpacing = MIN_HORIZONTAL_SPACING; // Minimum horizontal spacing
+			// if (horizontalSpacing > WINDOW_WIDTH - MAX_HORIZONTAL_SPACING)
+			// 	horizontalSpacing = MAX_HORIZONTAL_SPACING;
         } else {
             // If the widest level has only one node, use a default large spacing (or the full width)
-            horizontalSpacing = WINDOW_WIDTH - horizontalPadding; // Essentially centers the single node
+            // horizontalSpacing = WINDOW_WIDTH - horizontalPadding; // Essentially centers the single node
+            horizontalSpacing = DEFAULT_HORIZONTAL_SPACING; // Essentially centers the single node
         }
 
         // --- Recalculate Positions for All Nodes ---
-        // Iterate through all nodes in the tree and update their screen positions
-        // based on the newly calculated levelHeight and horizontalSpacing.
-        for (int depth = 0; depth < nodesAtDepth.size(); ++depth) {
-            // Get the number of nodes at the current depth
-            float currentLevelNodeCount = nodesAtDepth[depth].size();
-            if (currentLevelNodeCount == 0) continue; // Should not happen for existing levels
+        // Recalculate positions recursively starting from the root.
+        // This approach positions children symmetrically around their parent's X,
+        // which helps maintain vertical alignment down branches.
+        recalculatePositionsRecursive(root);
+    }
 
-            // Calculate the total width needed for nodes at this level based on the new spacing
-            // This is (number of nodes - 1) * spacing between centers
-            float totalLevelWidth = (currentLevelNodeCount - 1) * horizontalSpacing;
+    // Recursive helper function to recalculate node positions after layout adjustment
+    void recalculatePositionsRecursive(VisualTreeNode* node) {
+        if (!node) return; // Base case
 
-            // Calculate the starting X position for this level to center it in the window
-            float levelStartX = WINDOW_WIDTH / 2.0f - totalLevelWidth / 2.0f;
+        // Update the node's Y position based on its depth and the new levelHeight
+        node->position.y = startY + node->depth * levelHeight;
 
-            // Iterate through each node at the current depth and update its position
-            for (int i = 0; i < nodesAtDepth[depth].size(); ++i) {
-                VisualTreeNode* node = nodesAtDepth[depth][i];
-
-                // Calculate the node's X position based on its order at this depth and the horizontal spacing
-                node->position.x = levelStartX + i * horizontalSpacing;
-
-                // Calculate the node's Y position based on its depth and the new levelHeight
-                node->position.y = startY + depth * levelHeight; // Use the new levelHeight
-            }
+        // The X position is determined by the parent's call, except for the root.
+        // The root is always centered horizontally.
+        if (node->parent == nullptr) { // It's the root node
+            node->position.x = WINDOW_WIDTH / 2.0f;
         }
 
-        // Ensure the root node's position is correctly updated based on the new startY and centered X
-        if (root) {
-             root->position = {WINDOW_WIDTH / 2.0f, startY};
+
+        // Position children symmetrically around the parent's X and recursively call for them.
+        int numChildren = node->children.size();
+        if (numChildren == 0) return; // Base case: no children
+
+        // Calculate the starting X position for the range where children will be placed.
+        // This centers the group of children horizontally below the parent.
+        float childrenStartX = node->position.x - (numChildren - 1) * horizontalSpacing / 2.0f;
+
+        // Iterate through each child and calculate its X position, then recurse.
+        for (int i = 0; i < numChildren; ++i) {
+            VisualTreeNode* child = node->children[i];
+
+            // Calculate the child's X position based on its index among siblings and the horizontal spacing.
+            child->position.x = childrenStartX + i * horizontalSpacing;
+
+            // Recursively call this function for the child node to position its subtree.
+            recalculatePositionsRecursive(child);
         }
     }
+
 };
 
 #endif // TREE_VISUALIZER_H
