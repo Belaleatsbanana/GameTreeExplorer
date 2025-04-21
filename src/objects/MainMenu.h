@@ -154,7 +154,7 @@ class MainMenu {
                 const std::string player2Name = getPlayer2Name();
 
                 GameManager gameManager(bSize, player1Name, player2Name,
-                                        GameManager::VisualizationMode::GRAPH);
+                                        GameManager::VisualizationMode::TREE);
                 gameManager.run();
             }
         } else if (exitButton.getGlobalBounds().contains(mousePos)) {
