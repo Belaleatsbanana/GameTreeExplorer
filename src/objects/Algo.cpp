@@ -1,65 +1,44 @@
 #include "Algo.h"
 
-#include <SFML/System/Sleep.hpp>
-#include <SFML/System/Time.hpp>
-#include <cstdio>
-#include <iostream>
 #include <queue>
-#include <utility>
 
 #include "GameState.h"
 #include "Player.h"
 #include "Stack.h"
 
-enum Outcome {
-    WON,
-    LOSS,
-};
+enum Outcome { WON, LOSS };
 
+// Helper function to check winning state
 bool isWinningState(Player &player) {
-    bool reachedEnd = true;
     int n = player.getTokenCount();
-
     if (player.getPlayerNumber() == 0) {
-        for (auto token : player.getTokens()) {
-            if (token->getPosition().first != n + 1) {
-                reachedEnd = false;
-                break;
-            }
-        }
+        for (auto token : player.getTokens())
+            if (token->getPosition().first != n + 1) return false;
     } else {
-        for (auto token : player.getTokens()) {
-            if (token->getPosition().second != n + 1) {
-                reachedEnd = false;
-                break;
-            }
-        }
+        for (auto token : player.getTokens())
+            if (token->getPosition().second != n + 1) return false;
     }
-
-    return reachedEnd;
+    return true;
 }
 
 Player &getOpponent(GameState &state, Player &player) {
-    if (state.getOtherPlayer().getPlayerNumber() == player.getPlayerNumber())
-        return state.getCurrentPlayer();
-    else
-        return state.getOtherPlayer();
+    return (state.getCurrentPlayer().getPlayerNumber() == player.getPlayerNumber())
+               ? state.getOtherPlayer()
+               : state.getCurrentPlayer();
 }
 
-std::pair<int, int> calculatePossibleMove(pair<int, int> from, Player &player, GameState &state) {
-    int playerNumber = player.getPlayerNumber();
-    int x = from.first;
-    int y = from.second;
-
-    const sf::Vector2i direction(playerNumber == 0 ? 1 : 0, playerNumber == 1 ? 1 : 0);
-
-    auto pairMove = state.getBoard().getTokenMove(x, y, x + direction.x, y + direction.y);
-    return pairMove;
+std::pair<int, int> calculatePossibleMove(std::pair<int, int> from, Player &player,
+                                          GameState &state) {
+    const int dx = (player.getPlayerNumber() == 0) ? 1 : 0;
+    const int dy = (player.getPlayerNumber() == 1) ? 1 : 0;
+    return state.getBoard().getTokenMove(from.first, from.second, from.first + dx,
+                                         from.second + dy);
 }
 
-Outcome recusionMove(GameState &state, Player &player, Stack<algo::MoveStep> &history,
-                     std::queue<algo::MoveStep> &visual, bool &hasWon) {
-    if (hasWon) return player.getPlayerNumber() == 1 ? WON : LOSS;
+// Modified to return both outcome and best move
+Outcome recursionMove(GameState &state, Player &player, bool &hasWon,
+                      std::queue<algo::MoveStep> &moveQueue, Stack<algo::MoveStep> &history) {
+    if (hasWon) return WON;
 
     if (isWinningState(player)) {
         if (player.getPlayerNumber() == 1) hasWon = true;
@@ -73,37 +52,67 @@ Outcome recusionMove(GameState &state, Player &player, Stack<algo::MoveStep> &hi
     for (auto token : player.getTokens()) {
         if (!token->isMovable()) continue;
 
-        std::pair<int, int> oldMove = token->getPosition();
+        auto oldPos = token->getPosition();
+        auto newPos = calculatePossibleMove(oldPos, player, state);
+        if (newPos.first == -1) continue;
 
-        std::pair<int, int> newMove = calculatePossibleMove(oldMove, player, state);
+        // Make the move
+        state.getBoard().moveTokenRaw(oldPos.first, oldPos.second, newPos.first, newPos.second);
+        moveQueue.push(algo::MoveStep{oldPos, newPos, player.getPlayerNumber(), true});
+        if (player.getPlayerNumber() == 1)
+            history.push(algo::MoveStep{oldPos, newPos, player.getPlayerNumber(), true});
 
-        if (newMove.first == -1) {
-            continue;
-        }
+        // Recurse with opponent
+        auto opponentOutcome =
+            recursionMove(state, getOpponent(state, player), hasWon, moveQueue, history);
 
-        visual.push(algo::MoveStep{oldMove, newMove, player.getPlayerNumber(), true});
-        history.push(algo::MoveStep{oldMove, newMove, player.getPlayerNumber(), true});
+        // Undo move
+        state.getBoard().moveTokenRaw(newPos.first, newPos.second, oldPos.first, oldPos.second);
+        moveQueue.push(algo::MoveStep{newPos, oldPos, player.getPlayerNumber(), false});
 
-        state.getBoard().moveTokenRaw(oldMove.first, oldMove.second, newMove.first, newMove.second);
-        Outcome result = recusionMove(state, getOpponent(state, player), history, visual, hasWon);
-        state.getBoard().moveTokenRaw(newMove.first, newMove.second, oldMove.first, oldMove.second);
-
-        visual.push(algo::MoveStep{newMove, oldMove, player.getPlayerNumber(), false});
-        if (result == LOSS || hasWon) {
-            if (player.getPlayerNumber() == 1) hasWon = true;
+        if (opponentOutcome == LOSS) {
+            algo::MoveStep bestMove{oldPos, newPos, player.getPlayerNumber(), true};
+            if (player.getPlayerNumber() == 1) hasWon = true;  // Stop further exploration
+            std::cout << "Good branch for : " << player.getPlayerNumber() << " Move " << bestMove
+                      << std::endl;
             return WON;
+        } else if (player.getPlayerNumber() == 1) {
+            history.pop();
         }
-
-        history.pop();
     }
-
     return LOSS;
 }
 
-void algo::playNextMove(GameState &state, Player &player, Stack<MoveStep> &history,
-                        std::queue<MoveStep> &visual) {
-    GameState newState = state;
-    bool hasFoundWin = false;
-    recusionMove(newState, player, history, visual, hasFoundWin);
-    if (!hasFoundWin && history.empty()) history.push(visual.front());
+void algo::playNextMove(GameState &state, Player &player, Stack<algo::MoveStep> &history,
+                        std::queue<algo::MoveStep> &visual) {
+    GameState stateCopy = state;
+    bool hasWon = false;
+
+    auto outcome = recursionMove(stateCopy, player, hasWon, visual, history);
+
+    if (outcome == LOSS) {
+        // Fallback logic
+        for (auto token : player.getTokens()) {
+            if (!token->isMovable()) continue;
+            auto oldPos = token->getPosition();
+            auto newPos = calculatePossibleMove(oldPos, player, state);
+            if (newPos.first != -1) {
+                algo::MoveStep fallback{oldPos, newPos, player.getPlayerNumber(), true};
+                history.push(fallback);
+                break;
+            }
+        }
+    }
 }
+
+/**
+ * SEQUENCE OF PATTERNS TO GET ALL BRANCHES
+ * SEQUENCE 1 (3x3)
+ * Fallback: Token 1 -> Token 2 -> Token 3
+ * Branching: Token 2
+ * Branching: Token 2
+ * Branching: Token 3
+ * Branching: Token 3
+ * Fallback: Token 2
+ *
+ */

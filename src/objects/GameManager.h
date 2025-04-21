@@ -8,22 +8,24 @@
 #include <SFML/Window/Event.hpp>
 #include <SFML/Window/VideoMode.hpp>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <ostream>
 #include <queue>
 #include <stack>
+#include <utility>
 // #include <stack>
 
 #include "Algo.h"
 #include "GameBoard.h"
 #include "GameState.h"
-#include "TreeVisualizer.h"
 #include "Stack.h"
+#include "TreeVisualizer.h"
 
 class GameManager {
    public:
-    enum VisualizationMode { NONE, TOKEN, GRAPH };
+    enum VisualizationMode { NONE, TOKEN, TREE };
 
    private:
     struct GameSettings {
@@ -77,6 +79,9 @@ class GameManager {
     void handleTokenMove(const sf::Vector2i &gridPos) {
         try {
             state.moveToken(selectedPosition.x, selectedPosition.y, gridPos.x, gridPos.y);
+            // movesQueue.push(algo::MoveStep{make_pair(selectedPosition.x, selectedPosition.y),
+            //                                make_pair(gridPos.x, gridPos.y),
+            //                                state.getCurrentPlayer().getPlayerNumber(), true});
 
             checkWinCondition();
             checkOtherPlayerMoves();
@@ -138,30 +143,31 @@ class GameManager {
     }
 
     void handleBotTurn() {
-        std::queue<algo::MoveStep> visualizeMoves;
+		std::queue<algo::MoveStep> movesQueue;
 		Stack<algo::MoveStep> history;
-        algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves);
+
+        algo::playNextMove(state, state.getCurrentPlayer(), history, movesQueue);
 
         algo::MoveStep nextStep;
 
-        if (settings.visualizationMode == GRAPH) {
-            TreeVisualizer visualizer(visualizeMoves);
+        if (settings.visualizationMode == TREE) {
+            TreeVisualizer visualizer(movesQueue);
             visualizer.run();
         } else if (settings.visualizationMode == TOKEN) {
-            GameBoard fakeBoard(state.getBoard());
+            GameBoard fakeBoard(state.getBoard()); 
 
-            const int referenceGridSize = 5;                  // Baseline grid size (e.g., 5x5)
-            const sf::Time baseDelay = sf::milliseconds(10);  // Delay for referenceGridSize
+            const int referenceGridSize = 5;                  
+            const sf::Time baseDelay = sf::milliseconds(10); 
 
-            // Calculate scale factor (bigger grid → smaller delay)
             float scaleFactor = static_cast<float>(referenceGridSize * referenceGridSize) /
-                                (settings.size * settings.size * visualizeMoves.size());
+                                (settings.size * settings.size * movesQueue.size());
+
             sf::Time dynamicDelay = sf::microseconds(
                 static_cast<std::int64_t>(baseDelay.asMicroseconds() * scaleFactor));
 
-            while (!visualizeMoves.empty()) {
-                auto i = visualizeMoves.front();
-                visualizeMoves.pop();
+            while (!movesQueue.empty()) {
+                auto i = movesQueue.front();
+                movesQueue.pop();
                 fakeBoard.moveTokenRaw(i.from.first, i.from.second, i.to.first, i.to.second);
 
                 window.clear(sf::Color::White);
@@ -169,13 +175,16 @@ class GameManager {
                 fakeBoard.draw(window, settings.cellSize, settings.cellSize, true);
                 window.display();
 
-                // Apply delay proportional to the distance
                 sf::sleep(dynamicDelay);
             }
         }
 
+		// Clear movesQueue to ensure no repetition of moves next turn
+		movesQueue = {}; 
+
         while (!history.empty()) {
             auto i = history.top();
+            std::cout << i << std::endl;
             history.pop();
             nextStep = i;
         }

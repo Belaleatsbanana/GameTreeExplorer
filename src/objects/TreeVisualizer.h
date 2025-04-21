@@ -7,17 +7,15 @@
 #include <SFML/System/Time.hpp>
 #include <SFML/System/Vector2.hpp>
 #include <algorithm>
-#include <array>  // Required for sf::Vertex array
-#include <cmath>
+#include <array>
 #include <iostream>
-#include <map>  // Required for potential node tracking (though simplified here)
+#include <map>
 #include <queue>
 #include <vector>
 
-#include "Algo.h"  // Assuming Algo.h defines Algo::MoveStep
+#include "Algo.h"
 
-// Constants for visualization
-const int WINDOW_WIDTH = 1200;  // Increased width for potentially wider trees
+const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 1200;
 
 const float MIN_NODE_RADIUS = 2;
@@ -32,9 +30,7 @@ const float MIN_HORIZONTAL_SPACING = (MIN_NODE_RADIUS * 2) + 20.0f;
 const float MAX_HORIZONTAL_SPACING = 120.0f;
 const float DEFAULT_HORIZONTAL_SPACING = 60.0f;
 
-// Define player colors - assuming player numbers are 0 and 1
-const sf::Color PLAYER_COLORS[] = {sf::Color::Green,
-                                   sf::Color::Red};  // Player 0: Blue, Player 1: Red
+const sf::Color PLAYER_COLORS[] = {sf::Color::Red, sf::Color::Green};
 
 // Struct to represent a node in the visualization tree
 struct VisualTreeNode {
@@ -95,7 +91,7 @@ class TreeVisualizer {
         : window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Backtracking Tree Visualization"),
           visualQueue(visualQueue) {
         // Set the frame rate limit for smooth animation
-        window.setFramerateLimit(60);
+        window.setFramerateLimit(120);
 
         // Load the font. Replace "arial.ttf" with the actual path to your font file.
         if (!font.openFromFile("arial.ttf")) {
@@ -130,7 +126,7 @@ class TreeVisualizer {
     // Runs the visualization loop
     void run() {
         sf::Clock clock;              // Clock to manage animation speed
-        float animationSpeed = 0.1f;  // Time delay in seconds between processing each step
+        float animationSpeed = 0.05f;  // Time delay in seconds between processing each step
         float timeAccumulator = 0;    // Accumulates elapsed time
 
         // Main window loop
@@ -153,8 +149,9 @@ class TreeVisualizer {
                 processNextStep();    // Process one move/revert step from the queue
                 adjustLayout();       // Call the layout adjustment function
             } else if (visualQueue.empty()) {
-                sf::sleep(sf::seconds(1.0));  // Display the final tree state for 3 seconds
-                window.close();               // Close the window after the delay
+				continue;
+                // sf::sleep(sf::seconds(1.0));  // Display the final tree state for 3 seconds
+                // window.close();               // Close the window after the delay
             }
 
             // --- Drawing ---
@@ -390,8 +387,7 @@ class TreeVisualizer {
                 std::to_string(nextStep.to.second) + ")\n" +
                 "Direction: " + (nextStep.isForwards ? "Forward" : "Backward"));
             // Set text color based on the player of the next step
-            infoText.setFillColor(
-                PLAYER_COLORS[nextStep.playerNumber == -1 ? 0 : nextStep.playerNumber % 2]);
+            infoText.setFillColor(PLAYER_COLORS[nextStep.playerNumber]);
         } else {
             // Display a message when the visualization is complete
             infoText.setString("Visualization Complete.");
