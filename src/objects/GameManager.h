@@ -13,11 +13,13 @@
 #include <ostream>
 #include <queue>
 #include <stack>
+// #include <stack>
 
 #include "Algo.h"
 #include "GameBoard.h"
 #include "GameState.h"
 #include "TreeVisualizer.h"
+#include "Stack.h"
 
 class GameManager {
    public:
@@ -46,7 +48,6 @@ class GameManager {
 
     std::string player1Name;
     std::string player2Name;
-    std::stack<algo::MoveStep> history;
 
     void handleTokenSelection(const sf::Vector2i &gridPos) {
         try {
@@ -138,6 +139,7 @@ class GameManager {
 
     void handleBotTurn() {
         std::queue<algo::MoveStep> visualizeMoves;
+		Stack<algo::MoveStep> history;
         algo::playNextMove(state, state.getCurrentPlayer(), history, visualizeMoves);
 
         algo::MoveStep nextStep;

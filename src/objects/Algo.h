@@ -2,8 +2,10 @@
 #define ALGO_H
 
 #include <queue>
-#include <stack>
 #include <utility>
+
+#include "Stack.h"
+
 class GameState;
 class Player;
 class GameBoard;
@@ -16,7 +18,7 @@ struct MoveStep {
     bool isForwards;
 };
 
-void playNextMove(GameState &gameState, Player &player, std::stack<MoveStep> &history,
+void playNextMove(GameState &gameState, Player &player, Stack<MoveStep> &history,
                   std::queue<MoveStep> &visual);
 }  // namespace algo
 

@@ -5,11 +5,11 @@
 #include <cstdio>
 #include <iostream>
 #include <queue>
-#include <stack>
 #include <utility>
 
 #include "GameState.h"
 #include "Player.h"
+#include "Stack.h"
 
 enum Outcome {
     WON,
@@ -57,7 +57,7 @@ std::pair<int, int> calculatePossibleMove(pair<int, int> from, Player &player, G
     return pairMove;
 }
 
-Outcome recusionMove(GameState &state, Player &player, std::stack<algo::MoveStep> &history,
+Outcome recusionMove(GameState &state, Player &player, Stack<algo::MoveStep> &history,
                      std::queue<algo::MoveStep> &visual, bool &hasWon) {
     if (hasWon) return player.getPlayerNumber() == 1 ? WON : LOSS;
 
@@ -85,7 +85,6 @@ Outcome recusionMove(GameState &state, Player &player, std::stack<algo::MoveStep
         history.push(algo::MoveStep{oldMove, newMove, player.getPlayerNumber(), true});
 
         state.getBoard().moveTokenRaw(oldMove.first, oldMove.second, newMove.first, newMove.second);
-
         Outcome result = recusionMove(state, getOpponent(state, player), history, visual, hasWon);
         state.getBoard().moveTokenRaw(newMove.first, newMove.second, oldMove.first, oldMove.second);
 
@@ -101,7 +100,7 @@ Outcome recusionMove(GameState &state, Player &player, std::stack<algo::MoveStep
     return LOSS;
 }
 
-void algo::playNextMove(GameState &state, Player &player, std::stack<MoveStep> &history,
+void algo::playNextMove(GameState &state, Player &player, Stack<MoveStep> &history,
                         std::queue<MoveStep> &visual) {
     GameState newState = state;
     bool hasFoundWin = false;
