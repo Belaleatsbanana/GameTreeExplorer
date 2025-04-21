@@ -46,7 +46,7 @@ class MainMenu {
     GameManager::VisualizationMode stringToMode(const std::string &modeStr) {
         if (modeStr == "None") return GameManager::NONE;
         if (modeStr == "Token") return GameManager::TOKEN;
-        if (modeStr == "Tree") return GameManager::GRAPH;
+        if (modeStr == "Tree") return GameManager::TREE;
         throw std::invalid_argument("Invalid visualization mode: " + modeStr);
     }
 
@@ -269,7 +269,7 @@ class MainMenu {
           visualLabel(font, "Visualization Mode:", 24),
           player1Field{sf::RectangleShape(), sf::Text(font, "", 24), sf::Text(font, "Player1", 24)},
           player2Field{sf::RectangleShape(), sf::Text(font, "", 24), sf::Text(font, "Player2", 24)},
-          boardSizeField{sf::RectangleShape(), sf::Text(font, "", 24), sf::Text(font, "5", 24)} {
+          boardSizeField{sf::RectangleShape(), sf::Text(font, "", 24), sf::Text(font, "3", 24)} {
         initializeText(title, "Game Setup", 50.f);
         initializeText(playButton, "Start Game", 520.f);  // Moved down
         initializeText(exitButton, "Exit", 575.f);        // Moved down
@@ -283,3 +283,4 @@ class MainMenu {
     }
 };
 
+#endif

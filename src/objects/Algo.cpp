@@ -92,6 +92,7 @@ void algo::playNextMove(GameState &state, Player &player, Stack<algo::MoveStep> 
 
     if (outcome == LOSS) {
         // Fallback logic
+		std::cout << "FALLBACK TO FIRST POSSIBLE MOVE" << std::endl;
         for (auto token : player.getTokens()) {
             if (!token->isMovable()) continue;
             auto oldPos = token->getPosition();
