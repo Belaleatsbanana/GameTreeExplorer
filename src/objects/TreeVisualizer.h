@@ -6,6 +6,7 @@
 #include <SFML/System/Sleep.hpp>
 #include <SFML/System/Time.hpp>
 #include <SFML/System/Vector2.hpp>
+#include <algorithm>
 #include <array>  // Required for sf::Vertex array
 #include <cmath>
 #include <iostream>
@@ -19,9 +20,9 @@
 const int WINDOW_WIDTH = 1200;  // Increased width for potentially wider trees
 const int WINDOW_HEIGHT = 1200;
 
-const int MIN_NODE_RADIUS = 2;
-const int MAX_NODE_RADIUS = 12;
-const int DEFAULT_NODE_RADIUS = 12;
+const float MIN_NODE_RADIUS = 2;
+const float MAX_NODE_RADIUS = 12;
+const float DEFAULT_NODE_RADIUS = 12;
 
 const float MIN_LEVEL_HEIGHT = 20.0f;
 const float MAX_LEVEL_HEIGHT = 80.0f;
@@ -81,7 +82,7 @@ class TreeVisualizer {
     float levelHeight = DEFAULT_LEVEL_HEIGHT;  // Vertical spacing between levels
     float horizontalSpacing =
         DEFAULT_HORIZONTAL_SPACING;  // Base horizontal spacing between nodes at the same level
-    int nodeRadius = DEFAULT_NODE_RADIUS;
+    float nodeRadius = DEFAULT_NODE_RADIUS;
     float startX = WINDOW_WIDTH / 2.0f;  // X position for the root node (center of the window)
     float startY = 20.0f;                // Y position for the root node (near the top)
 
@@ -405,93 +406,204 @@ class TreeVisualizer {
 
     // Function to adjust layout based on the maximum depth and width of the tree
     void adjustLayout() {
-        // Calculate the maximum depth reached in the tree.
-        // nodesAtDepth.size() gives the number of levels (depth 0 is the first level).
-        // Max depth is the number of levels minus 1.
+        // Calculate the maximum depth reached in the tree
         int maxDepth = nodesAtDepth.empty() ? 0 : nodesAtDepth.size() - 1;
 
-        // The maximum number of nodes at any single depth is tracked in maxNodesAtAnyDepth.
-        int widestLevelNodeCount = maxNodesAtAnyDepth;
+        // Count leaf nodes in the tree to estimate the tree's final width
+        int leafCount = countLeafNodes(root);
+
+        // Calculate horizontal positions using post-order traversal
+        std::map<VisualTreeNode*, float> nodePositions;
+        float treeWidth = calculateHorizontalPositions(root, 0, nodePositions);
 
         // Define padding for the window edges
-        float verticalPadding = 100.0f;   // Padding at the top and bottom
-        float horizontalPadding = 50.0f;  // Padding on the left and right
+        float verticalPadding = 100.0f;
+        float horizontalPadding = 100.0f;
 
-        // Calculate the new level height to fit the tree vertically within the window
+        // Calculate the new level height to fit the tree vertically
         if (maxDepth > 0) {
-            // Available vertical space is WINDOW_HEIGHT minus padding. Divide by maxDepth to get
-            // spacing between levels.
             levelHeight = (WINDOW_HEIGHT - verticalPadding) / static_cast<float>(maxDepth);
-            if (levelHeight < MIN_LEVEL_HEIGHT) levelHeight = MIN_LEVEL_HEIGHT;
-            if (levelHeight > MAX_LEVEL_HEIGHT) levelHeight = MAX_LEVEL_HEIGHT;
-            // // Ensure a minimum level height to prevent nodes from being too close
-            // if (levelHeight < 50.0f) levelHeight = 50.0f; // Minimum vertical spacing
+            levelHeight = std::min(std::max(levelHeight, MIN_LEVEL_HEIGHT), MAX_LEVEL_HEIGHT);
         } else {
-            // If maxDepth is 0 (only root node), use a default level height
             levelHeight = DEFAULT_LEVEL_HEIGHT;
         }
 
-        nodeRadius = levelHeight / 2.5f;  // Example: radius is about 40% of level height
-        if (nodeRadius < MIN_NODE_RADIUS) nodeRadius = MIN_NODE_RADIUS;
-        if (nodeRadius > MAX_NODE_RADIUS) nodeRadius = MAX_NODE_RADIUS;
+        // Adjust node radius based on level height
+        nodeRadius = levelHeight / 2.5f;
+        nodeRadius = std::min(std::max(nodeRadius, static_cast<float>(MIN_NODE_RADIUS)),
+                              static_cast<float>(MAX_NODE_RADIUS));
 
-        // Calculate the new horizontal spacing to fit the widest level horizontally
-        if (widestLevelNodeCount > 1) {
-            // Available horizontal space is WINDOW_WIDTH minus padding.
-            // Divide by (widestLevelNodeCount - 1) to get spacing between the centers of nodes at
-            // the widest level.
-            horizontalSpacing =
-                (WINDOW_WIDTH - horizontalPadding) / static_cast<float>(widestLevelNodeCount - 1);
-            // Ensure a minimum horizontal spacing
-            if (horizontalSpacing < MIN_HORIZONTAL_SPACING)
-                horizontalSpacing = MIN_HORIZONTAL_SPACING;  // Minimum horizontal spacing
-            // if (horizontalSpacing > WINDOW_WIDTH - MAX_HORIZONTAL_SPACING)
-            // 	horizontalSpacing = MAX_HORIZONTAL_SPACING;
-        } else {
-            // If the widest level has only one node, use a default large spacing (or the full
-            // width) horizontalSpacing = WINDOW_WIDTH - horizontalPadding; // Essentially centers
-            // the single node
-            horizontalSpacing = DEFAULT_HORIZONTAL_SPACING;  // Essentially centers the single node
-        }
+        // Calculate horizontal spacing based on available width and number of leaf nodes
+        horizontalSpacing =
+            std::min(std::max((WINDOW_WIDTH - horizontalPadding) / std::max(leafCount, 1),
+                              MIN_HORIZONTAL_SPACING),
+                     MAX_HORIZONTAL_SPACING);
 
-        // --- Recalculate Positions for All Nodes ---
-        // Recalculate positions recursively starting from the root.
-        // This approach positions children symmetrically around their parent's X,
-        // which helps maintain vertical alignment down branches.
-        recalculatePositionsRecursive(root);
+        // Apply calculated positions to all nodes
+        applyCalculatedPositions(root, nodePositions, treeWidth);
     }
 
-    // Recursive helper function to recalculate node positions after layout adjustment
-    void recalculatePositionsRecursive(VisualTreeNode* node) {
-        if (!node) return;  // Base case
+    // Count leaf nodes in the tree
+    int countLeafNodes(VisualTreeNode* node) {
+        if (!node) return 0;
+        if (node->children.empty()) return 1;
 
-        // Update the node's Y position based on its depth and the new levelHeight
-        node->position.y = startY + node->depth * levelHeight;
+        int count = 0;
+        for (auto* child : node->children) {
+            count += countLeafNodes(child);
+        }
+        return count;
+    }
 
-        // The X position is determined by the parent's call, except for the root.
-        // The root is always centered horizontally.
-        if (node->parent == nullptr) {  // It's the root node
-            node->position.x = WINDOW_WIDTH / 2.0f;
+    // Calculate horizontal positions for nodes using an improved algorithm
+    // Returns the total width of the tree
+    float calculateHorizontalPositions(VisualTreeNode* node, float x,
+                                       std::map<VisualTreeNode*, float>& positions) {
+        if (!node) return 0;
+
+        // If this is a leaf node, position it directly at x
+        if (node->children.empty()) {
+            positions[node] = x;
+            return x + 1.0f;  // Return the next available position
         }
 
-        // Position children symmetrically around the parent's X and recursively call for them.
-        int numChildren = node->children.size();
-        if (numChildren == 0) return;  // Base case: no children
+        // If node has only one child, keep them vertically aligned
+        if (node->children.size() == 1) {
+            float nextX = calculateHorizontalPositions(node->children[0], x, positions);
+            positions[node] = positions[node->children[0]];  // Align with the child
+            return nextX;
+        }
 
-        // Calculate the starting X position for the range where children will be placed.
-        // This centers the group of children horizontally below the parent.
-        float childrenStartX = node->position.x - (numChildren - 1) * horizontalSpacing / 2.0f;
+        // For nodes with multiple children
+        float childStartX = x;
+        float totalWidth = 0;
 
-        // Iterate through each child and calculate its X position, then recurse.
-        for (int i = 0; i < numChildren; ++i) {
-            VisualTreeNode* child = node->children[i];
+        // First pass: position all children and calculate total width
+        for (auto* child : node->children) {
+            float nextX = calculateHorizontalPositions(child, childStartX, positions);
+            totalWidth += (nextX - childStartX);
+            childStartX = nextX;
+        }
 
-            // Calculate the child's X position based on its index among siblings and the horizontal
-            // spacing.
-            child->position.x = childrenStartX + i * horizontalSpacing;
+        // Position the parent node at the center of its children
+        float leftmostChildPos = positions[node->children.front()];
+        float rightmostChildPos = positions[node->children.back()];
+        positions[node] = (leftmostChildPos + rightmostChildPos) / 2.0f;
 
-            // Recursively call this function for the child node to position its subtree.
-            recalculatePositionsRecursive(child);
+        return x + totalWidth;
+    }
+
+    // Apply the calculated positions to all nodes and center the tree in the window
+    void applyCalculatedPositions(VisualTreeNode* node,
+                                  const std::map<VisualTreeNode*, float>& positions,
+                                  float treeWidth) {
+        if (!node) return;
+
+        // Calculate scaling factor to fit the tree width in the window
+        float scale =
+            std::min((WINDOW_WIDTH - 100.0f) / std::max(treeWidth * horizontalSpacing, 1.0f), 1.0f);
+
+        // Find min and max X position to center the tree
+        float minX = std::numeric_limits<float>::max();
+        float maxX = std::numeric_limits<float>::lowest();
+
+        for (const auto& pair : positions) {
+            minX = std::min(minX, pair.second);
+            maxX = std::max(maxX, pair.second);
+        }
+
+        // Calculate the offset to center the tree
+        float totalWidth = (maxX - minX) * horizontalSpacing * scale;
+        float offsetX = (WINDOW_WIDTH - totalWidth) / 2.0f;
+
+        // Apply positions to all nodes
+        for (size_t depth = 0; depth < nodesAtDepth.size(); depth++) {
+            for (auto* node : nodesAtDepth[depth]) {
+                if (positions.find(node) != positions.end()) {
+                    // Calculate x position with scaling and centering
+                    float relativeX = positions.at(node) - minX;
+                    node->position.x = offsetX + relativeX * horizontalSpacing * scale;
+
+                    // Y position based on depth
+                    node->position.y = startY + depth * levelHeight;
+                }
+            }
+        }
+
+        // Apply any final spacing adjustments to prevent overlaps
+        preventNodeOverlaps();
+    }
+
+    // Method to prevent nodes from overlapping
+    void preventNodeOverlaps() {
+        const float minDistance = nodeRadius * 2.2f;
+
+        // Process each depth level
+        for (size_t depth = 0; depth < nodesAtDepth.size(); depth++) {
+            auto& nodes = nodesAtDepth[depth];
+
+            // Sort nodes by x position
+            std::sort(nodes.begin(), nodes.end(),
+                      [](const VisualTreeNode* a, const VisualTreeNode* b) {
+                          return a->position.x < b->position.x;
+                      });
+
+            // Check and fix overlaps
+            for (size_t i = 1; i < nodes.size(); i++) {
+                VisualTreeNode* prev = nodes[i - 1];
+                VisualTreeNode* curr = nodes[i];
+
+                float actualDistance = curr->position.x - prev->position.x;
+                if (actualDistance < minDistance) {
+                    float adjustment = (minDistance - actualDistance) / 2.0f;
+
+                    // Move previous node left and current node right
+                    prev->position.x -= adjustment;
+                    curr->position.x += adjustment;
+                }
+            }
+        }
+
+        // Ensure all nodes are within window bounds
+        for (size_t depth = 0; depth < nodesAtDepth.size(); depth++) {
+            for (auto* node : nodesAtDepth[depth]) {
+                node->position.x =
+                    std::max(nodeRadius + 10.0f,
+                             std::min(node->position.x, WINDOW_WIDTH - nodeRadius - 10.0f));
+            }
+        }
+    }
+
+    // Utility method to verify branch separation after layout is complete
+    // Call this at the end of adjustLayout() if needed
+    void verifyBranchSeparation() {
+        // For each node with multiple children, ensure the children are properly spaced
+        for (size_t depth = 0; depth < nodesAtDepth.size() - 1; depth++) {
+            for (auto* parent : nodesAtDepth[depth]) {
+                if (parent->children.size() > 1) {
+                    // Sort children by x position
+                    std::sort(parent->children.begin(), parent->children.end(),
+                              [](const VisualTreeNode* a, const VisualTreeNode* b) {
+                                  return a->position.x < b->position.x;
+                              });
+
+                    // Check spacing between adjacent children
+                    for (size_t i = 1; i < parent->children.size(); i++) {
+                        VisualTreeNode* prevChild = parent->children[i - 1];
+                        VisualTreeNode* currChild = parent->children[i];
+
+                        float minSeparation = nodeRadius * 3.0f;  // Minimum branch separation
+                        float actualSeparation = currChild->position.x - prevChild->position.x;
+
+                        if (actualSeparation < minSeparation) {
+                            // Adjust positions to ensure proper branch separation
+                            float adjustment = (minSeparation - actualSeparation) / 2.0f;
+                            prevChild->position.x -= adjustment;
+                            currChild->position.x += adjustment;
+                        }
+                    }
+                }
+            }
         }
     }
 };
